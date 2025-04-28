@@ -92,9 +92,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Pallet not found' });
       }
       
-      res.json(pallet);
+      // Check if there are older lots with the same RM number for FIFO checking
+      const olderLots = await storage.findOlderLotsWithSameRM(pallet.rmNumber, palletId);
+      
+      // Return the pallet with any older lots that should be used first (FIFO)
+      res.json({
+        ...pallet,
+        fifoCheck: {
+          hasOlderLots: olderLots.length > 0,
+          olderLots
+        }
+      });
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch pallet' });
+    }
+  });
+  
+  // Get older lots with same RM number (for FIFO checking)
+  app.get('/api/pallets/older-lots/:rmNumber', async (req, res) => {
+    try {
+      const rmNumber = req.params.rmNumber;
+      const excludePalletId = req.query.excludePalletId as string | undefined;
+      
+      const olderLots = await storage.findOlderLotsWithSameRM(rmNumber, excludePalletId);
+      
+      res.json({
+        hasOlderLots: olderLots.length > 0,
+        olderLots
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to check for older lots' });
     }
   });
   

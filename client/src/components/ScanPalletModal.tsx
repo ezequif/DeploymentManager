@@ -12,11 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import ScannerModal from "./ScannerModal";
 import { printPalletLabel } from "@/lib/barcodeUtils";
 import { formatDate, formatDateTime, formatQuantity, isExpired, isExpiringSoon } from "@/lib/formatUtils";
-import { PalletWithLots } from "@shared/schema";
+import { PalletWithLots, Lot, Pallet } from "@shared/schema";
 
 interface ScanPalletModalProps {
   isOpen: boolean;
@@ -29,8 +30,16 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
   const { toast } = useToast();
   const [scanned, setScanned] = useState(false);
 
+  // Define the extended type including FIFO check results
+  type PalletWithFIFOCheck = PalletWithLots & {
+    fifoCheck?: {
+      hasOlderLots: boolean;
+      olderLots: Array<{pallet: Pallet, lot: Lot}>;
+    }
+  };
+  
   // Query for pallet data
-  const { data: pallet, isLoading, error, refetch } = useQuery<PalletWithLots>({
+  const { data: pallet, isLoading, error, refetch } = useQuery<PalletWithFIFOCheck>({
     queryKey: ["/api/pallets/by-id", palletId],
     queryFn: async () => {
       if (!palletId) return null;
@@ -141,6 +150,35 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
 
                 {pallet && (
                   <>
+                    {/* FIFO Check Alert */}
+                    {pallet.fifoCheck?.hasOlderLots && (
+                      <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200 text-amber-800">
+                        <div className="flex items-start">
+                          <span className="material-icons text-amber-500 mr-2 mt-0.5">warning</span>
+                          <div>
+                            <AlertTitle className="text-amber-800 font-bold">FIFO/FEFO Warning</AlertTitle>
+                            <AlertDescription className="text-amber-700">
+                              <p className="mb-2">Older lots of RM# {pallet.rmNumber} exist in other locations. Consider using those first:</p>
+                              <ul className="list-disc ml-5 space-y-1">
+                                {pallet.fifoCheck.olderLots.slice(0, 3).map((item, index) => (
+                                  <li key={index}>
+                                    <span className="font-semibold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
+                                  </li>
+                                ))}
+                                {pallet.fifoCheck.olderLots.length > 3 && (
+                                  <li className="text-amber-600">
+                                    <span className="font-semibold">
+                                      +{pallet.fifoCheck.olderLots.length - 3} more location(s)
+                                    </span>
+                                  </li>
+                                )}
+                              </ul>
+                            </AlertDescription>
+                          </div>
+                        </div>
+                      </Alert>
+                    )}
+                    
                     <div className="border border-gray-200 rounded-md overflow-hidden shadow-sm mb-4">
                       {/* Enhanced Pallet Header */}
                       <div className="bg-gradient-to-r from-primary-50 to-gray-50 p-4 border-b border-gray-200">

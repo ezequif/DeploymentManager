@@ -2,9 +2,9 @@ import {
   Pallet, InsertPallet, 
   Lot, InsertLot,
   Transaction, InsertTransaction,
-  PalletWithLots, PalletStatus,
-  pallets, lots, transactions
+  PalletWithLots, PalletStatus
 } from "@shared/schema";
+import { pallets, lots, transactions } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
