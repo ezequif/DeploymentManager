@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 97%;
+  --foreground: 20 14.3% 4.1%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  
+  /* Primary: Blue */
+  --primary: 210 100% 45%;
+  --primary-foreground: 0 0% 100%;
+  
+  /* Secondary: Orange */  
+  --secondary: 36 100% 50%;
+  --secondary-foreground: 0 0% 100%;
+  
+  --accent: 220 14.3% 95.9%;
+  --accent-foreground: 24 9.8% 10%;
+  
+  /* Status colors */
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 9.1% 97.8%;
+  --success: 120 100% 25%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92.7% 50.2%;
+  --warning-foreground: 0 0% 100%;
+  
+  --ring: 20 14.3% 4.1%;
+  --radius: 0.5rem;
+  
+  /* Chart colors */
+  --chart-1: 210 100% 45%;
+  --chart-2: 36 100% 50%;
+  --chart-3: 120 100% 25%;
+  --chart-4: 0 84.2% 60.2%;
+  --chart-5: 262 83.3% 57.8%;
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  
+  /* Primary: Blue */
+  --primary: 210 100% 45%;
+  --primary-foreground: 0 0% 100%;
+  
+  /* Secondary: Orange */
+  --secondary: 36 100% 50%;
+  --secondary-foreground: 0 0% 98%;
+  
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  
+  /* Status colors */
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 120 100% 25%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92.7% 50.2%;
+  --warning-foreground: 0 0% 98%;
+  
+  --ring: 240 4.9% 83.9%;
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom animations */
+.expiring-soon {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    background-color: rgba(255, 152, 0, 0.1);
+  }
+  50% {
+    background-color: rgba(255, 152, 0, 0.3);
+  }
+}
+
+.pallet-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.pallet-card:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
