@@ -2,9 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDateTime, formatQuantity } from "../lib/formatUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClockIcon, HistoryIcon } from "lucide-react";
-import { Transaction, PalletWithLots } from "@shared/schema";
+import { Transaction, PalletWithLots, TransactionType } from "@shared/schema";
 
-type TransactionWithUnit = Transaction & { unit?: string };
+// Extend the Transaction type to include unit
+type TransactionWithUnit = Transaction & { 
+  unit?: string;
+  transactionType: TransactionType; 
+};
 
 export default function History() {
   const { data: transactions, isLoading, error } = useQuery<TransactionWithUnit[]>({

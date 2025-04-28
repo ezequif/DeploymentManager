@@ -182,6 +182,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(validatedData);
       
+      // Create transaction if needed
+      if (req.body.transaction) {
+        const transactionData = {
+          ...req.body.transaction,
+          lotId: lot.id // Use the newly created lot's ID
+        };
+        
+        const validatedTransaction = insertTransactionSchema.parse(transactionData);
+        await storage.createTransaction(validatedTransaction);
+      }
+      
       // Get updated pallet with lots
       const pallet = await storage.getPallet(lot.palletId);
       
