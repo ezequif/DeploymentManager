@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useWebSocket } from "../lib/websocket";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { SignalHigh, SignalLow, Users } from "lucide-react";
+import { SignalHigh, SignalLow, Users, Package } from "lucide-react";
 import ConnectedClientsModal from "./ConnectedClientsModal";
 
 export default function Header() {
@@ -13,7 +13,7 @@ export default function Header() {
     <header className="bg-primary text-white shadow-md">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-3">
-          <span className="material-icons text-3xl">inventory</span>
+          <Package className="h-7 w-7" />
           <h1 className="text-xl font-bold">Warehouse Pallet System</h1>
         </div>
         <div className="flex items-center space-x-3">

@@ -23,21 +23,21 @@ export default function Layout({ children }: LayoutProps) {
               href="/" 
               className={`px-6 py-4 font-medium flex items-center ${location === '/' ? 'border-b-2 border-primary text-primary' : 'text-gray-600 hover:text-primary'}`}
             >
-              <span className="material-icons mr-2">view_list</span>
+              <LayoutGrid className="h-5 w-5 mr-2" />
               Pallets
             </a>
             <a 
               href="/history" 
               className={`px-6 py-4 font-medium flex items-center ${location === '/history' ? 'border-b-2 border-primary text-primary' : 'text-gray-600 hover:text-primary'}`}
             >
-              <span className="material-icons mr-2">history</span>
+              <History className="h-5 w-5 mr-2" />
               History
             </a>
             <a 
               href="/settings" 
               className={`px-6 py-4 font-medium flex items-center ${location === '/settings' ? 'border-b-2 border-primary text-primary' : 'text-gray-600 hover:text-primary'}`}
             >
-              <span className="material-icons mr-2">settings</span>
+              <Settings className="h-5 w-5 mr-2" />
               Settings
             </a>
           </div>

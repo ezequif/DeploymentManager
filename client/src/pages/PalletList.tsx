@@ -16,7 +16,15 @@ import {
   DropdownMenuRadioItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { FilterIcon, CheckIcon } from "lucide-react";
+import { 
+  FilterIcon, 
+  CheckIcon, 
+  QrCode, 
+  Search, 
+  Plus, 
+  WifiOff, 
+  Package
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // Define status types locally to avoid import issues
@@ -92,7 +100,7 @@ export default function PalletList() {
             variant="outline"
             onClick={openScanPalletModal}
           >
-            <span className="material-icons text-2xl">qr_code_scanner</span>
+            <QrCode className="h-6 w-6" />
             SCAN PALLET
           </Button>
         </div>
@@ -163,7 +171,7 @@ export default function PalletList() {
           <div className="w-full sm:max-w-md">
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                <span className="material-icons text-gray-400">search</span>
+                <Search className="h-5 w-5 text-gray-400" />
               </span>
               <Input
                 type="text"
