@@ -160,22 +160,22 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                   <>
                     {/* FIFO Check Alert */}
                     {pallet.fifoCheck?.hasOlderLots && (
-                      <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200 text-amber-800">
+                      <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
                         <div className="flex items-start">
-                          <span className="material-icons text-amber-500 mr-2 mt-0.5">warning</span>
+                          <span className="material-icons text-red-600 mr-2 mt-0.5 text-2xl animate-pulse">warning</span>
                           <div>
-                            <AlertTitle className="text-amber-800 font-bold">FIFO/FEFO Warning</AlertTitle>
-                            <AlertDescription className="text-amber-700">
-                              <p className="mb-2">Older lots of RM# {pallet.rmNumber} exist in other locations. Consider using those first:</p>
+                            <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
+                            <AlertDescription className="text-red-700 font-semibold">
+                              <p className="mb-2 text-base">Older lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> exist in other locations. Consider using those first:</p>
                               <ul className="list-disc ml-5 space-y-1">
                                 {pallet.fifoCheck.olderLots.slice(0, 3).map((item, index) => (
-                                  <li key={index}>
-                                    <span className="font-semibold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
+                                  <li key={index} className="font-bold">
+                                    <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
                                   </li>
                                 ))}
                                 {pallet.fifoCheck.olderLots.length > 3 && (
-                                  <li className="text-amber-600">
-                                    <span className="font-semibold">
+                                  <li className="text-red-600">
+                                    <span className="font-extrabold">
                                       +{pallet.fifoCheck.olderLots.length - 3} more location(s)
                                     </span>
                                   </li>
