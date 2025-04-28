@@ -18,30 +18,34 @@ interface PickModalProps {
 }
 
 export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
-  const [quantity, setQuantity] = useState(lot.quantity);
+  // Initialize with default quantity (full lot quantity)
+  const [quantity, setQuantity] = useState<number | ''>(lot.quantity);
   const [destination, setDestination] = useState("");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   
   const pickMutation = useMutation({
     mutationFn: async () => {
-      if (quantity <= 0) {
+      // Convert empty string to 0 for validation
+      const numQuantity = typeof quantity === 'string' ? 0 : quantity;
+      
+      if (numQuantity <= 0) {
         throw new Error("Quantity must be greater than 0");
       }
       
-      if (quantity > lot.quantity) {
+      if (numQuantity > lot.quantity) {
         throw new Error("Cannot pick more than available quantity");
       }
       
       // Update lot quantity
-      const newQuantity = lot.quantity - quantity;
+      const newQuantity = lot.quantity - numQuantity;
       
       return apiRequest("PATCH", `/api/lots/${lot.id}`, {
         quantity: newQuantity,
         transaction: {
           lotId: lot.id,
           transactionType: "pick",
-          quantity: quantity,
+          quantity: numQuantity,
           destination,
           notes
         }
@@ -50,9 +54,10 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      const numQuantity = typeof quantity === 'string' ? 0 : quantity;
       toast({
         title: "Lot picked",
-        description: `Successfully picked ${quantity} ${lot.unit} from lot ${lot.lotNumber}`
+        description: `Successfully picked ${numQuantity} ${lot.unit} from lot ${lot.lotNumber}`
       });
       onClose();
     },
@@ -102,7 +107,10 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                       min="0.1"
                       max={lot.quantity.toString()}
                       value={quantity || ''}
-                      onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuantity(val === '' ? '' : parseFloat(val));
+                      }}
                       className="flex-1"
                     />
                     <span className="ml-2 text-gray-700 font-medium">{lot.unit}</span>
@@ -152,7 +160,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
             </Button>
             <Button 
               onClick={() => pickMutation.mutate()}
-              disabled={pickMutation.isPending || quantity <= 0 || quantity > lot.quantity}
+              disabled={pickMutation.isPending || quantity === '' || (typeof quantity === 'number' && (quantity <= 0 || quantity > lot.quantity))}
               className="w-full sm:w-auto bg-secondary hover:bg-secondary/90"
             >
               {pickMutation.isPending ? "Processing..." : "Confirm Pick"}
