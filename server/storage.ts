@@ -241,7 +241,24 @@ export class DatabaseStorage implements IStorage {
     if (lot.expirationDate) {
       // Log the date for debugging
       console.log("Create lot - original date from client:", lot.expirationDate);
-      // Keep the date as is, don't create Date objects which could cause timezone shifts
+      
+      // Directly use the date string without any conversion
+      // Database stores it as text, so no need for Date objects
+      
+      // If the date doesn't include a timezone specifier, treat it as local time
+      // This prevents unwanted timezone conversions
+      if (lot.expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Already in YYYY-MM-DD format, keep as is
+        console.log("Date is already in YYYY-MM-DD format, keeping as is:", lot.expirationDate);
+      } else {
+        // Convert to YYYY-MM-DD format
+        const date = new Date(lot.expirationDate);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        lot.expirationDate = `${year}-${month}-${day}`;
+        console.log("Normalized date to YYYY-MM-DD format:", lot.expirationDate);
+      }
     }
     
     const [newLot] = await db.insert(lots).values(lot).returning();
@@ -254,11 +271,23 @@ export class DatabaseStorage implements IStorage {
     if (lot.expirationDate) {
       // Extract the date portion only to prevent timezone issues
       try {
-        // Keep date exactly as provided without timezone conversion
-        console.log("Original date from client:", lot.expirationDate);
+        // Log the date for debugging
+        console.log("Update lot - original date from client:", lot.expirationDate);
         
-        // Format: YYYY-MM-DD - keep it as is, don't create Date objects
-        // which could cause timezone shifts
+        // If the date doesn't include a timezone specifier, treat it as local time
+        // This prevents unwanted timezone conversions
+        if (lot.expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          // Already in YYYY-MM-DD format, keep as is
+          console.log("Date is already in YYYY-MM-DD format, keeping as is:", lot.expirationDate);
+        } else {
+          // Convert to YYYY-MM-DD format
+          const date = new Date(lot.expirationDate);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          lot.expirationDate = `${year}-${month}-${day}`;
+          console.log("Normalized date to YYYY-MM-DD format:", lot.expirationDate);
+        }
       } catch (error) {
         console.error("Error normalizing date:", error);
       }

@@ -67,3 +67,34 @@ export function formatElapsedTime(date: Date): string {
     return `${Math.floor(seconds / 86400)} days ago`;
   }
 }
+
+/**
+ * Normalize date string to YYYY-MM-DD format for consistent storage
+ * This prevents timezone issues when storing dates
+ * 
+ * @param dateString Date string in any format that JavaScript can parse
+ * @returns Normalized date string in YYYY-MM-DD format
+ */
+export function normalizeDate(dateString: string): string {
+  // If it's already in YYYY-MM-DD format, return as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+  
+  try {
+    // Create a date object but force it to be interpreted in local timezone
+    const date = new Date(dateString);
+    
+    // Extract the year, month, and day separately
+    const year = date.getFullYear();
+    // getMonth() is zero-based, so add 1
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    
+    // Return the date in ISO format (YYYY-MM-DD)
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error("Error normalizing date:", error);
+    return dateString; // Return original if something goes wrong
+  }
+}
