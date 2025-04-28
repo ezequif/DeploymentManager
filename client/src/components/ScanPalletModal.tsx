@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import ScannerModal from "./ScannerModal";
+import PickModal from "./PickModal";
 import { printPalletLabel } from "@/lib/barcodeUtils";
 import { formatDate, formatDateTime, formatQuantity, isExpired, isExpiringSoon } from "@/lib/formatUtils";
 import { PalletWithLots, Lot, Pallet } from "@shared/schema";
@@ -29,6 +30,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
   const [scanned, setScanned] = useState(false);
+  const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
 
   // Define the extended type including FIFO check results
   type PalletWithFIFOCheck = PalletWithLots & {
@@ -89,6 +91,13 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
     setPalletId("");
     setScanned(false);
     onClose();
+  };
+  
+  // Handle picking lots
+  const handlePickLot = (lot: Lot) => {
+    if (pallet) {
+      setSelectedLot(lot);
+    }
   };
 
   return (
@@ -343,6 +352,19 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                                         )}
                                       </div>
                                     </div>
+                                    
+                                    {/* Add pick button for non-empty lots */}
+                                    {!isEmpty && (
+                                      <Button 
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => handlePickLot(lot)}
+                                        className="ml-2"
+                                      >
+                                        <span className="material-icons text-xs mr-1">add_shopping_cart</span>
+                                        Pick
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -360,6 +382,18 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
       </Dialog>
       
       {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />}
+      
+      {/* Add PickModal for lot picking functionality */}
+      {selectedLot && pallet && (
+        <PickModal 
+          pallet={pallet} 
+          lot={selectedLot} 
+          onClose={() => {
+            setSelectedLot(null);
+            refetch(); // Refresh data after picking
+          }} 
+        />
+      )}
     </>
   );
 }
