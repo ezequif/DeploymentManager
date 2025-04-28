@@ -1,44 +1,35 @@
-// Convert a date to Eastern Time Zone
-function convertToEasternTime(date: Date): Date {
-  // Create a date string with the timezone offset for Eastern Time (UTC-4 or UTC-5 depending on DST)
-  // This is a simplification - in a production app, you might want to use a library like date-fns-tz
-  const options: Intl.DateTimeFormatOptions = { 
-    timeZone: 'America/New_York',
-    year: 'numeric', 
-    month: 'numeric', 
-    day: 'numeric',
+// Format date in MM/DD/YYYY format
+// This displays exactly what the user sees, with no timezone shifting
+export function formatDate(date: string | Date): string {
+  // If date is a string in YYYY-MM-DD format (like from database), parse it directly
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = date.split('-').map(Number);
+    return `${month.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}/${year}`;
+  }
+  
+  // For other dates, use the standard JavaScript Date formatting
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+// Format date and time in MM/DD/YYYY hh:mm AM/PM format
+export function formatDateTime(date: string | Date): string {
+  // If date is a string in ISO format from the database, parse it directly
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hour12: false
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/New_York'
   };
   
-  // Format the date in Eastern Time
-  const easternTimeStr = new Intl.DateTimeFormat('en-US', options).format(date);
-  return new Date(easternTimeStr);
-}
-
-// Format date in MM/DD/YYYY format (Eastern Time)
-export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const eastern = convertToEasternTime(d);
-  
-  return `${(eastern.getMonth() + 1).toString().padStart(2, '0')}/${eastern.getDate().toString().padStart(2, '0')}/${eastern.getFullYear()}`;
-}
-
-// Format date and time in MM/DD/YYYY hh:mm AM/PM format (Eastern Time)
-export function formatDateTime(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const eastern = convertToEasternTime(d);
-  
-  const hours = eastern.getHours();
-  const minutes = eastern.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  
-  const formattedHours = hours % 12 || 12;
-  const formattedMinutes = minutes.toString().padStart(2, '0');
-  
-  return `${formatDate(d)} ${formattedHours}:${formattedMinutes} ${ampm} ET`;
+  // Format the date with Eastern Time zone
+  const formatted = new Intl.DateTimeFormat('en-US', options).format(d);
+  return `${formatted} ET`;
 }
 
 // Format number to always show 1 decimal place
@@ -46,37 +37,68 @@ export function formatQuantity(quantity: number): string {
   return quantity.toFixed(1);
 }
 
-// Check if date is expiring soon (within 30 days) - uses Eastern Time
-export function isExpiringSoon(expirationDate: string): boolean {
-  const expDate = new Date(expirationDate);
-  const today = new Date();
+// Helper function to convert date to Eastern Time for comparison
+function getEasternDateParts(date: Date): {year: number, month: number, day: number} {
+  const options: Intl.DateTimeFormatOptions = { 
+    timeZone: 'America/New_York',
+    year: 'numeric', 
+    month: 'numeric', 
+    day: 'numeric'
+  };
   
-  // Convert both dates to Eastern Time
-  const expDateEastern = convertToEasternTime(expDate);
-  const todayEastern = convertToEasternTime(today);
-  
-  // Set hours, minutes, seconds to 0 for accurate day comparison
-  todayEastern.setHours(0, 0, 0, 0);
-  
-  const diffTime = expDateEastern.getTime() - todayEastern.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return diffDays <= 30 && diffDays >= 0;
+  // Format date in Eastern Time
+  const [month, day, year] = new Intl.DateTimeFormat('en-US', options)
+    .format(date)
+    .split('/')
+    .map(Number);
+    
+  return { year, month, day };
 }
 
-// Check if date is expired - uses Eastern Time
+// Check if date is expiring soon (within 30 days) using Eastern Time
+export function isExpiringSoon(expirationDate: string): boolean {
+  // If the expiration date is in YYYY-MM-DD format (from database)
+  if (expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [expYear, expMonth, expDay] = expirationDate.split('-').map(Number);
+    
+    // Get today in Eastern Time
+    const today = new Date();
+    const { year: todayYear, month: todayMonth, day: todayDay } = getEasternDateParts(today);
+    
+    // Create Date objects for comparison (use noon to avoid time issues)
+    const expDateObj = new Date(expYear, expMonth - 1, expDay, 12, 0, 0);
+    const todayObj = new Date(todayYear, todayMonth - 1, todayDay, 12, 0, 0);
+    
+    // Calculate difference in days
+    const diffTime = expDateObj.getTime() - todayObj.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays <= 30 && diffDays >= 0;
+  }
+  
+  // Fallback for other date formats
+  return false;
+}
+
+// Check if date is expired using Eastern Time
 export function isExpired(expirationDate: string): boolean {
-  const expDate = new Date(expirationDate);
-  const today = new Date();
+  // If the expiration date is in YYYY-MM-DD format (from database)
+  if (expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [expYear, expMonth, expDay] = expirationDate.split('-').map(Number);
+    
+    // Get today in Eastern Time
+    const today = new Date();
+    const { year: todayYear, month: todayMonth, day: todayDay } = getEasternDateParts(today);
+    
+    // Create Date objects for comparison (use noon to avoid time issues)
+    const expDateObj = new Date(expYear, expMonth - 1, expDay, 12, 0, 0);
+    const todayObj = new Date(todayYear, todayMonth - 1, todayDay, 12, 0, 0);
+    
+    return expDateObj < todayObj;
+  }
   
-  // Convert both dates to Eastern Time
-  const expDateEastern = convertToEasternTime(expDate);
-  const todayEastern = convertToEasternTime(today);
-  
-  // Set hours, minutes, seconds to 0 for accurate day comparison
-  todayEastern.setHours(0, 0, 0, 0);
-  
-  return expDateEastern < todayEastern;
+  // Fallback for other date formats
+  return false;
 }
 
 // Format elapsed time for last sync
@@ -100,35 +122,30 @@ export function formatElapsedTime(date: Date): string {
 }
 
 /**
- * Normalize date string to YYYY-MM-DD format for consistent storage in Eastern Time
- * This function handles timezone issues by explicitly using Eastern Time
- * to preserve the exact date chosen by the user in Eastern Time Zone.
+ * Normalize date string to YYYY-MM-DD format for consistent storage
+ * This function preserves the date as entered by the user 
+ * without any timezone transformations.
  * 
  * @param dateString Date string in any format that JavaScript can parse (preferably YYYY-MM-DD)
- * @returns Normalized date string in YYYY-MM-DD format (Eastern Time)
+ * @returns Normalized date string in YYYY-MM-DD format
  */
 export function normalizeDate(dateString: string): string {
   try {
-    // If it's already in YYYY-MM-DD format, parse it directly
+    // If it's already in YYYY-MM-DD format, return it as-is
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split('-').map(n => parseInt(n, 10));
-      
-      // Use the date as provided - it's already in the expected format
-      // This preserves dates entered directly in the date picker
       return dateString;
     }
     
-    // For other formats, convert to a Date and then to Eastern Time
+    // For other formats, use the getEasternDateParts helper
     const date = new Date(dateString);
-    const easternDate = convertToEasternTime(date);
+    const { year, month, day } = getEasternDateParts(date);
     
     // Format as YYYY-MM-DD
-    const year = easternDate.getFullYear();
-    const month = (easternDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = easternDate.getDate().toString().padStart(2, '0');
+    const monthStr = month.toString().padStart(2, '0');
+    const dayStr = day.toString().padStart(2, '0');
     
-    // Return the date in ISO format (YYYY-MM-DD) using Eastern Time values
-    return `${year}-${month}-${day}`;
+    // Return the date in ISO format (YYYY-MM-DD)
+    return `${year}-${monthStr}-${dayStr}`;
   } catch (error) {
     console.error("Error normalizing date:", error);
     return dateString; // Return original if something goes wrong
