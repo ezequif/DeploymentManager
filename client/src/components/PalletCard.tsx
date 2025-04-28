@@ -7,6 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import PickModal from "./PickModal";
+import AddLotModal from "./AddLotModal";
 
 interface PalletCardProps {
   pallet: PalletWithLots;
@@ -20,6 +21,8 @@ export default function PalletCard({ pallet }: PalletCardProps) {
     isOpen: false,
     lot: null
   });
+  
+  const [isAddLotModalOpen, setIsAddLotModalOpen] = useState(false);
   const { toast } = useToast();
   
   // Sort lots by expiration date (ascending)
@@ -258,22 +261,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           <div className="mt-3 flex justify-end">
             <button 
               className="text-primary font-medium flex items-center text-sm hover:bg-gray-50 px-3 py-1 rounded"
-              onClick={() => {
-                // Sample implementation to add a lot
-                // In a real app, this would open a modal
-                const today = new Date();
-                const futureDate = new Date();
-                futureDate.setMonth(today.getMonth() + 6);
-                
-                const formattedDate = futureDate.toISOString().split('T')[0];
-                
-                addLot.mutate({
-                  lotNumber: `L${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
-                  quantity: 100,
-                  unit: 'KGS',
-                  expirationDate: formattedDate
-                });
-              }}
+              onClick={() => setIsAddLotModalOpen(true)}
             >
               <span className="material-icons text-sm mr-1">add</span>
               Add Lot
@@ -287,6 +275,14 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           pallet={pallet} 
           lot={pickModal.lot} 
           onClose={() => setPickModal({ isOpen: false, lot: null })} 
+        />
+      )}
+      
+      {isAddLotModalOpen && (
+        <AddLotModal
+          pallet={pallet}
+          isOpen={isAddLotModalOpen}
+          onClose={() => setIsAddLotModalOpen(false)}
         />
       )}
     </>

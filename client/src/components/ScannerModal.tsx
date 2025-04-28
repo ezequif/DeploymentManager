@@ -6,9 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface ScannerModalProps {
   onClose: () => void;
+  onScan?: (result: string) => void;
 }
 
-export default function ScannerModal({ onClose }: ScannerModalProps) {
+export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
   const [scanResult, setScanResult] = useState<string | null>(null);
@@ -110,6 +111,12 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
               title: "Code Scanned",
               description: `Scanned code: ${code}`
             });
+            
+            // Call the onScan callback if provided
+            if (onScan) {
+              onScan(code);
+            }
+            
             onClose();
           }, 1500);
         }
@@ -131,6 +138,12 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
         title: "Code Entered",
         description: `Entered code: ${manualCode}`
       });
+      
+      // Call the onScan callback if provided
+      if (onScan) {
+        onScan(manualCode);
+      }
+      
       onClose();
     } else {
       toast({

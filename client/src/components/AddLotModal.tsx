@@ -1,0 +1,189 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PalletWithLots } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import ScannerModal from "./ScannerModal";
+
+interface AddLotModalProps {
+  pallet: PalletWithLots;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function AddLotModal({ pallet, isOpen, onClose }: AddLotModalProps) {
+  const [lotNumber, setLotNumber] = useState("");
+  const [quantity, setQuantity] = useState<number | null>(null);
+  const [unit, setUnit] = useState<"KGS" | "LBS">("KGS");
+  const [expirationDate, setExpirationDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  
+  const { toast } = useToast();
+
+  // Add lot mutation
+  const addLotMutation = useMutation({
+    mutationFn: async () => {
+      if (!lotNumber || !quantity) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      return apiRequest("POST", "/api/lots", {
+        palletId: pallet.id,
+        lotNumber,
+        quantity,
+        unit,
+        expirationDate,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pallets"] });
+      toast({
+        title: "Lot Added",
+        description: `Lot ${lotNumber} has been added to pallet ${pallet.palletId}.`,
+      });
+      onClose();
+      
+      // Reset form
+      setLotNumber("");
+      setQuantity(null);
+      setUnit("KGS");
+      setExpirationDate(new Date().toISOString().split("T")[0]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Adding Lot",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle scanner results
+  const handleScanResult = (result: string) => {
+    setLotNumber(result);
+    setIsScannerOpen(false);
+  };
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Add New Lot</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="mb-4">
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+                <div className="grid grid-cols-2 gap-y-2">
+                  <div className="text-sm text-gray-500">Pallet ID:</div>
+                  <div className="text-sm font-medium text-gray-900">{pallet.palletId}</div>
+                  <div className="text-sm text-gray-500">RM Number:</div>
+                  <div className="text-sm font-medium text-gray-900">{pallet.rmNumber}</div>
+                  <div className="text-sm text-gray-500">Location:</div>
+                  <div className="text-sm font-medium text-gray-900">{pallet.location}</div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="lotNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                    Lot Number*
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="lotNumber"
+                      value={lotNumber}
+                      onChange={(e) => setLotNumber(e.target.value)}
+                      placeholder="Enter lot number"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="absolute right-2 top-2 text-gray-500"
+                    >
+                      <span className="material-icons">qr_code_scanner</span>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity*
+                    </Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={quantity || ''}
+                      onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="unit" className="block text-sm font-medium text-gray-700 mb-1">
+                      Unit
+                    </Label>
+                    <Select
+                      value={unit}
+                      onValueChange={(value) => setUnit(value as "KGS" | "LBS")}
+                    >
+                      <SelectTrigger id="unit">
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KGS">KGS</SelectItem>
+                        <SelectItem value="LBS">LBS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="expirationDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    Expiration Date*
+                  </Label>
+                  <Input
+                    id="expirationDate"
+                    type="date"
+                    value={expirationDate}
+                    onChange={(e) => setExpirationDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={onClose}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => addLotMutation.mutate()}
+                disabled={addLotMutation.isPending || !lotNumber || !quantity}
+                className="w-full sm:w-auto bg-secondary hover:bg-secondary/90"
+              >
+                {addLotMutation.isPending ? "Adding..." : "Add Lot"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />}
+    </>
+  );
+}
