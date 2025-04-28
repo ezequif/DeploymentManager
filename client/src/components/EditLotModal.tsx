@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeDate } from "@/lib/formatUtils";
 import ScannerModal from "./ScannerModal";
 
 interface EditLotModalProps {
@@ -27,19 +28,7 @@ export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotMo
   
   const { toast } = useToast();
 
-  // Helper to preserve the date exactly as entered by the user
-  const normalizeDate = (dateString: string): string => {
-    // This ensures that dates entered by the user are preserved exactly as typed,
-    // preventing timezone offset issues
-    const parts = dateString.split('-');
-    if (parts.length !== 3) return dateString;
-    
-    const year = parseInt(parts[0]);
-    const month = parseInt(parts[1]);
-    const day = parseInt(parts[2]);
-    
-    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-  };
+  // Using the imported normalizeDate function from formatUtils.ts
 
   // Update lot mutation
   const updateLotMutation = useMutation({
