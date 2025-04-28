@@ -3,12 +3,14 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import NotFound from "@/pages/not-found";
 import Layout from "./components/Layout";
 import PalletList from "./pages/PalletList";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
+import ScanPalletModal from "./components/ScanPalletModal";
+import { WebSocketProvider } from "./lib/websocket";
 
 function Router() {
   return (
@@ -24,12 +26,34 @@ function Router() {
 }
 
 function App() {
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  
+  // Create a global function to open the scan modal
+  window.openScanPalletModal = () => setIsScanModalOpen(true);
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <WebSocketProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          
+          {/* Global Floating Action Button */}
+          <button
+            onClick={() => setIsScanModalOpen(true)}
+            className="fixed bottom-6 right-6 bg-primary text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg z-50"
+            aria-label="Scan Pallet"
+          >
+            <span className="material-icons">qr_code_scanner</span>
+          </button>
+          
+          {/* Scan Pallet Modal */}
+          <ScanPalletModal
+            isOpen={isScanModalOpen}
+            onClose={() => setIsScanModalOpen(false)}
+          />
+        </TooltipProvider>
+      </WebSocketProvider>
     </QueryClientProvider>
   );
 }

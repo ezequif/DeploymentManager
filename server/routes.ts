@@ -81,6 +81,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get a pallet by its pallet ID (not internal ID) - specific route must come before parameterized routes
+  app.get('/api/pallets/by-id/:palletId', async (req, res) => {
+    try {
+      const palletId = req.params.palletId;
+      const pallet = await storage.getPalletByPalletId(palletId);
+      
+      if (!pallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      res.json(pallet);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch pallet' });
+    }
+  });
+  
   // Get a single pallet with its lots
   app.get('/api/pallets/:id', async (req, res) => {
     try {

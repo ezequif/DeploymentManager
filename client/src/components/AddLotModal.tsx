@@ -15,7 +15,7 @@ interface AddLotModalProps {
   pallet: PalletWithLots;
   isOpen: boolean;
   onClose: () => void;
-  existingLot?: Lot; // Pass an existing lot for edit mode
+  existingLot?: Lot | null; // Pass an existing lot for edit mode
 }
 
 export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: AddLotModalProps) {
