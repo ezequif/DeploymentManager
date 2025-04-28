@@ -18,7 +18,7 @@ interface PickModalProps {
 }
 
 export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
-  const [quantity, setQuantity] = useState(0);
+  const [quantity, setQuantity] = useState(lot.quantity);
   const [destination, setDestination] = useState("");
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
@@ -92,19 +92,30 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="pickQuantity" className="block text-sm font-medium text-gray-700 mb-1">Pick Quantity</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="pickQuantity"
-                    type="number"
-                    step="0.1"
-                    placeholder="0.0"
-                    min="0.1"
-                    max={lot.quantity.toString()}
-                    value={quantity || ''}
-                    onChange={(e) => setQuantity(parseFloat(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="ml-2 text-gray-700 font-medium">{lot.unit}</span>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center flex-1">
+                    <Input
+                      id="pickQuantity"
+                      type="number"
+                      step="0.1"
+                      placeholder="0.0"
+                      min="0.1"
+                      max={lot.quantity.toString()}
+                      value={quantity || ''}
+                      onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="ml-2 text-gray-700 font-medium">{lot.unit}</span>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setQuantity(lot.quantity)}
+                    className="whitespace-nowrap"
+                  >
+                    Pick All
+                  </Button>
                 </div>
               </div>
               
