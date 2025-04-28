@@ -71,6 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate a new pallet ID - specific route must come before parameterized routes
+  app.get('/api/pallets/generate-id', async (req, res) => {
+    try {
+      const palletId = await storage.generatePalletId();
+      res.json({ palletId });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to generate pallet ID' });
+    }
+  });
+  
   // Get a single pallet with its lots
   app.get('/api/pallets/:id', async (req, res) => {
     try {
@@ -84,16 +94,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(pallet);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch pallet' });
-    }
-  });
-
-  // Generate a new pallet ID
-  app.get('/api/pallets/generate-id', async (req, res) => {
-    try {
-      const palletId = await storage.generatePalletId();
-      res.json({ palletId });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to generate pallet ID' });
     }
   });
 
