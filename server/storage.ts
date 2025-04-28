@@ -1,8 +1,9 @@
 import { 
-  pallets, Pallet, InsertPallet, 
-  lots, Lot, InsertLot,
-  transactions, Transaction, InsertTransaction,
-  PalletWithLots, PalletStatus
+  Pallet, InsertPallet, 
+  Lot, InsertLot,
+  Transaction, InsertTransaction,
+  PalletWithLots, PalletStatus,
+  pallets, lots, transactions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
@@ -148,11 +149,22 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Found pallet to delete: ${pallet.palletId}`);
       
-      // First delete related lots to avoid foreign key constraint issues
+      // Find all lot IDs related to this pallet
+      const lotsToDelete = await this.getLots(id);
+      console.log(`Found ${lotsToDelete.length} lots to delete for pallet ID: ${id}`);
+      
+      // For each lot, delete related transactions first
+      for (const lot of lotsToDelete) {
+        console.log(`Deleting transactions for lot ID: ${lot.id}`);
+        // Delete all transactions related to this lot
+        await db.delete(transactions).where(eq(transactions.lotId, lot.id));
+      }
+      
+      // Then delete all lots for this pallet
       console.log(`Deleting lots for pallet ID: ${id}`);
       await db.delete(lots).where(eq(lots.palletId, id));
       
-      // Then delete the pallet
+      // Finally delete the pallet
       console.log(`Deleting pallet ID: ${id}`);
       const result = await db.delete(pallets).where(eq(pallets.id, id)).returning();
       
@@ -195,8 +207,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLot(id: number): Promise<boolean> {
-    const result = await db.delete(lots).where(eq(lots.id, id)).returning();
-    return result.length > 0;
+    try {
+      console.log(`Attempting to delete lot with ID: ${id}`);
+      
+      // First delete any transactions related to this lot
+      console.log(`Deleting transactions for lot ID: ${id}`);
+      await db.delete(transactions).where(eq(transactions.lotId, id));
+      
+      // Then delete the lot
+      console.log(`Deleting lot ID: ${id}`);
+      const result = await db.delete(lots).where(eq(lots.id, id)).returning();
+      
+      console.log(`Delete result: ${JSON.stringify(result)}`);
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting lot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
   }
 
   async getTransactions(): Promise<Transaction[]> {
