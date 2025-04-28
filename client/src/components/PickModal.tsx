@@ -101,6 +101,35 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
         
         <div className="py-4">
           <div className="mb-4">
+            {/* FIFO Check Alert */}
+            {!isLoading && fifoCheck?.hasOlderLots && (
+              <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
+                <div className="flex items-start">
+                  <span className="material-icons text-red-600 mr-2 mt-0.5 text-2xl animate-pulse">warning</span>
+                  <div>
+                    <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
+                    <AlertDescription className="text-red-700 font-semibold">
+                      <p className="mb-2 text-base">Older lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> exist in other locations. Consider using those first:</p>
+                      <ul className="list-disc ml-5 space-y-1">
+                        {fifoCheck.olderLots.slice(0, 3).map((item, index) => (
+                          <li key={index} className="font-bold">
+                            <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
+                          </li>
+                        ))}
+                        {fifoCheck.olderLots.length > 3 && (
+                          <li className="text-red-600">
+                            <span className="font-extrabold">
+                              +{fifoCheck.olderLots.length - 3} more location(s)
+                            </span>
+                          </li>
+                        )}
+                      </ul>
+                    </AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+            )}
+            
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
               <div className="grid grid-cols-2 gap-y-2">
                 <div className="text-sm text-gray-500">Pallet ID:</div>
