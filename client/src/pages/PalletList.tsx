@@ -38,6 +38,13 @@ export default function PalletList() {
   // Also use WebSocket pallets as a backup/realtime source
   const { pallets: wsPallets } = useWebSocket();
   
+  // Function to open scan pallet modal
+  const openScanPalletModal = () => {
+    if (window.openScanPalletModal) {
+      window.openScanPalletModal();
+    }
+  };
+  
   // Combine both sources, preferring API pallets but using WebSocket as backup
   // Use useMemo instead of state to avoid infinite update loops
   const pallets = useMemo(() => {
@@ -72,6 +79,25 @@ export default function PalletList() {
   
   return (
     <>
+      {/* Prominent Scan Pallet Button - Always at the top */}
+      <div className="bg-primary bg-gradient-to-r from-primary to-primary-dark px-4 py-4 text-white">
+        <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between">
+          <div className="mb-4 sm:mb-0">
+            <h1 className="text-xl font-bold">Warehouse Inventory</h1>
+            <p className="text-primary-50">Scan a pallet to view complete lot information</p>
+          </div>
+          <Button 
+            className="w-full sm:w-auto bg-white hover:bg-gray-100 text-primary flex items-center justify-center gap-2 py-6 px-6 text-lg font-semibold border-2 border-white shadow-lg"
+            size="lg"
+            variant="outline"
+            onClick={openScanPalletModal}
+          >
+            <span className="material-icons text-2xl">qr_code_scanner</span>
+            SCAN PALLET
+          </Button>
+        </div>
+      </div>
+
       {/* Action Bar */}
       <div className="bg-white px-4 py-3 flex flex-col justify-between items-center space-y-3 shadow-sm">
         {/* Status Tabs - Full Width on Mobile */}

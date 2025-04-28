@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import ScannerModal from "./ScannerModal";
+import { printPalletLabel } from "@/lib/barcodeUtils";
 import { formatDate, formatDateTime, formatQuantity, isExpired, isExpiringSoon } from "@/lib/formatUtils";
 import { PalletWithLots } from "@shared/schema";
 
@@ -76,33 +77,48 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-lg max-h-[95vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Scan Pallet</DialogTitle>
-            <DialogDescription>
-              Scan a pallet tag or enter a pallet ID to view its information
+            <DialogTitle className="text-2xl font-bold text-primary">Scan Pallet</DialogTitle>
+            <DialogDescription className="text-base">
+              Scan a pallet tag or enter a pallet ID to view complete inventory information
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
-            <div className="mb-4">
-              <div className="flex space-x-2">
+            <div className="mb-6">
+              <div className="flex flex-col sm:flex-row sm:space-x-3 space-y-3 sm:space-y-0">
                 <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="material-icons text-gray-400">search</span>
+                  </div>
                   <Input
                     value={palletId}
                     onChange={(e) => setPalletId(e.target.value)}
                     placeholder="Enter pallet ID (e.g., PAL00001)"
-                    className="pr-10"
+                    className="pl-10 pr-12 py-6 text-lg"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSearch();
+                      }
+                    }}
                   />
                   <button
                     type="button"
                     onClick={() => setIsScannerOpen(true)}
-                    className="absolute right-2 top-2 text-gray-500"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary bg-primary-50 p-2 rounded-full hover:bg-primary-100"
                   >
                     <span className="material-icons">qr_code_scanner</span>
                   </button>
                 </div>
-                <Button onClick={handleSearch}>Search</Button>
+                <Button 
+                  onClick={handleSearch} 
+                  className="bg-primary hover:bg-primary-dark text-white py-6 px-8"
+                  size="lg"
+                >
+                  <span className="material-icons mr-2">search</span>
+                  Find Pallet
+                </Button>
               </div>
             </div>
 
@@ -124,89 +140,148 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                 )}
 
                 {pallet && (
-                  <div className="border border-gray-200 rounded-md overflow-hidden">
-                    {/* Pallet Header */}
-                    <div className="bg-gray-50 p-4 border-b border-gray-200">
-                      <div className="flex flex-wrap justify-between items-center">
-                        <div className="flex items-center space-x-2 mb-2 sm:mb-0">
-                          <span className="material-icons text-primary">inventory_2</span>
-                          <h3 className="font-bold text-lg text-primary">{pallet.palletId}</h3>
-                          <Badge className="bg-primary-light">Active</Badge>
+                  <>
+                    <div className="border border-gray-200 rounded-md overflow-hidden shadow-sm mb-4">
+                      {/* Enhanced Pallet Header */}
+                      <div className="bg-gradient-to-r from-primary-50 to-gray-50 p-4 border-b border-gray-200">
+                        <div className="flex flex-wrap justify-between items-center">
+                          <div className="flex items-center space-x-2 mb-2 sm:mb-0">
+                            <span className="material-icons text-primary text-2xl">inventory_2</span>
+                            <h3 className="font-bold text-xl text-primary">{pallet.palletId}</h3>
+                            {pallet.status && (
+                              <Badge className={
+                                pallet.status === "active" ? "bg-primary-light" : 
+                                pallet.status === "archived" ? "bg-amber-500 text-white" :
+                                "bg-red-500 text-white"
+                              }>
+                                {pallet.status.charAt(0).toUpperCase() + pallet.status.slice(1)}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Created: {formatDateTime(pallet.createdAt)}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          Created: {formatDateTime(pallet.createdAt)}
+                        
+                        <div className="grid grid-cols-2 gap-y-2 mt-3">
+                          <div className="text-sm text-gray-500">RM Number:</div>
+                          <div className="text-sm font-medium text-gray-900">{pallet.rmNumber}</div>
+                          <div className="text-sm text-gray-500">Location:</div>
+                          <div className="text-sm font-medium text-gray-900">{pallet.location}</div>
+                          <div className="text-sm text-gray-500">Total Lots:</div>
+                          <div className="text-sm font-medium text-gray-900">{pallet.lots.length}</div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="mt-4 flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-primary border-primary hover:bg-primary-50"
+                            onClick={() => printPalletLabel(pallet.palletId, pallet.rmNumber, pallet.location)}
+                          >
+                            <span className="material-icons text-sm mr-1">print</span>
+                            Print Label
+                          </Button>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-y-2 mt-3">
-                        <div className="text-sm text-gray-500">RM Number:</div>
-                        <div className="text-sm font-medium text-gray-900">{pallet.rmNumber}</div>
-                        <div className="text-sm text-gray-500">Location:</div>
-                        <div className="text-sm font-medium text-gray-900">{pallet.location}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Lots Section */}
-                    <div className="p-4">
-                      <Label className="text-sm font-semibold mb-2 block">
-                        Lots ({pallet.lots.length})
-                      </Label>
-                      
-                      {pallet.lots.length === 0 ? (
-                        <div className="text-center py-4 text-gray-500">
-                          No lots available for this pallet
+                      {/* Summary Stats */}
+                      <div className="p-3 bg-gray-50 border-b border-gray-200">
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-white p-2 rounded border border-gray-200">
+                            <div className="text-sm text-gray-500">Total Quantity</div>
+                            <div className="font-bold text-primary">
+                              {formatQuantity(pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0))}
+                            </div>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-gray-200">
+                            <div className="text-sm text-gray-500">Earliest Expiry</div>
+                            <div className="font-bold text-gray-800">
+                              {pallet.lots.length > 0 
+                                ? formatDate(pallet.lots
+                                    .filter(lot => lot.quantity > 0)
+                                    .sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime())[0]?.expirationDate || new Date())
+                                : "N/A"}
+                            </div>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-gray-200">
+                            <div className="text-sm text-gray-500">Units</div>
+                            <div className="font-bold text-gray-800">
+                              {Array.from(new Set(pallet.lots.map(lot => lot.unit))).join(", ") || "N/A"}
+                            </div>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {pallet.lots.map((lot) => {
-                            const isExpiringSoonFlag = isExpiringSoon(lot.expirationDate);
-                            const isExpiredFlag = isExpired(lot.expirationDate);
-                            
-                            return (
-                              <div 
-                                key={lot.id} 
-                                className={`p-3 rounded-md border ${
-                                  isExpiredFlag 
-                                    ? "border-red-200 bg-red-50" 
-                                    : isExpiringSoonFlag 
-                                      ? "border-yellow-200 bg-yellow-50" 
-                                      : "border-gray-200"
-                                }`}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div className="font-medium">{lot.lotNumber}</div>
-                                  <div className="font-bold text-right">
-                                    {formatQuantity(lot.quantity)} {lot.unit}
-                                  </div>
-                                </div>
-                                
-                                <div className="flex justify-between items-center mt-1 text-sm">
-                                  <div className="flex items-center">
-                                    <span className="material-icons text-gray-500 text-sm mr-1">event</span>
-                                    <div className={
-                                      isExpiredFlag 
-                                        ? "text-red-600" 
+                      </div>
+                      
+                      {/* Lots Section */}
+                      <div className="p-4">
+                        <Label className="text-sm font-semibold mb-2 block">
+                          Lot Details
+                        </Label>
+                        
+                        {pallet.lots.length === 0 ? (
+                          <div className="text-center py-4 text-gray-500">
+                            No lots available for this pallet
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {pallet.lots.map((lot) => {
+                              const isExpiringSoonFlag = isExpiringSoon(lot.expirationDate);
+                              const isExpiredFlag = isExpired(lot.expirationDate);
+                              const isEmpty = lot.quantity <= 0;
+                              
+                              return (
+                                <div 
+                                  key={lot.id} 
+                                  className={`p-3 rounded-md border ${
+                                    isEmpty
+                                      ? "border-gray-200 bg-gray-50 opacity-75"
+                                      : isExpiredFlag 
+                                        ? "border-red-200 bg-red-50" 
                                         : isExpiringSoonFlag 
-                                          ? "text-yellow-600" 
-                                          : "text-gray-600"
-                                    }>
-                                      Expires: {formatDate(lot.expirationDate)}
-                                      {isExpiredFlag && (
-                                        <span className="ml-1 text-red-600 font-semibold">(Expired)</span>
-                                      )}
-                                      {isExpiringSoonFlag && !isExpiredFlag && (
-                                        <span className="ml-1 text-yellow-600 font-semibold">(Expiring Soon)</span>
-                                      )}
+                                          ? "border-yellow-200 bg-yellow-50" 
+                                          : "border-gray-200 bg-white"
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div className="font-medium text-lg">{lot.lotNumber}</div>
+                                    <div className="font-bold text-right text-lg">
+                                      {formatQuantity(lot.quantity)} {lot.unit}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex justify-between items-center mt-1 text-sm">
+                                    <div className="flex items-center">
+                                      <span className="material-icons text-gray-500 text-sm mr-1">event</span>
+                                      <div className={
+                                        isExpiredFlag 
+                                          ? "text-red-600" 
+                                          : isExpiringSoonFlag 
+                                            ? "text-yellow-600" 
+                                            : "text-gray-600"
+                                      }>
+                                        Expires: {formatDate(lot.expirationDate)}
+                                        {isExpiredFlag && (
+                                          <span className="ml-1 text-red-600 font-semibold">(Expired)</span>
+                                        )}
+                                        {isExpiringSoonFlag && !isExpiredFlag && (
+                                          <span className="ml-1 text-yellow-600 font-semibold">(Expiring Soon)</span>
+                                        )}
+                                        {isEmpty && (
+                                          <span className="ml-1 text-gray-500 font-semibold">(Empty)</span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             )}

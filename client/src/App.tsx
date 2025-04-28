@@ -38,15 +38,6 @@ function App() {
           <Toaster />
           <Router />
           
-          {/* Global Floating Action Button */}
-          <button
-            onClick={() => setIsScanModalOpen(true)}
-            className="fixed bottom-6 right-6 bg-primary text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg z-50"
-            aria-label="Scan Pallet"
-          >
-            <span className="material-icons">qr_code_scanner</span>
-          </button>
-          
           {/* Scan Pallet Modal */}
           <ScanPalletModal
             isOpen={isScanModalOpen}
