@@ -32,31 +32,78 @@ export default function ConnectedClientsModal({ isOpen, onClose }: ConnectedClie
   useEffect(() => {
     const fetchClients = async () => {
       setLoading(true);
-      try {
-        const response = await fetch('/api/connected-clients');
-        
-        if (!response.ok) {
-          throw new Error(`Error fetching clients: ${response.status}`);
+      
+      // Create a WebSocket message listener specifically for this component
+      const messageHandler = (event: MessageEvent) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'connectedClients') {
+            console.log('Received connected clients data:', message.data);
+            setClients(message.data);
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
         }
-        
-        const data = await response.json();
-        setClients(data);
+      };
+      
+      // Add event listener when component mounts
+      window.addEventListener('message', messageHandler);
+      
+      try {
+        // First try to get via WebSocket for real-time data
+        if (connected) {
+          // Request clients via WebSocket
+          getConnectedClients();
+          
+          // Set a timeout to fall back to API if WebSocket doesn't respond
+          setTimeout(() => {
+            if (loading) {
+              fallbackToAPI();
+            }
+          }, 2000);
+        } else {
+          // If not connected, immediately use API fallback
+          fallbackToAPI();
+        }
       } catch (error) {
-        console.error('Error fetching connected clients:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch connected clients',
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
+        fallbackToAPI();
       }
+      
+      // Fallback function to use REST API if WebSocket fails
+      async function fallbackToAPI() {
+        try {
+          const response = await fetch('/api/connected-clients');
+          
+          if (!response.ok) {
+            throw new Error(`Error fetching clients: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          setClients(data);
+        } catch (error) {
+          console.error('Error fetching connected clients:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to fetch connected clients',
+            variant: 'destructive'
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
+      
+      // Cleanup function
+      return () => {
+        window.removeEventListener('message', messageHandler);
+      };
     };
 
     if (isOpen) {
       fetchClients();
     }
-  }, [isOpen, toast]);
+  }, [isOpen, toast, connected, getConnectedClients]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

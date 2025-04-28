@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { PalletWithLots } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 
@@ -7,6 +7,8 @@ type WebSocketContextType = {
   pallets: PalletWithLots[];
   userCount: number;
   lastSync: Date;
+  clientId: string | null;
+  getConnectedClients: () => void;
 };
 
 const WebSocketContext = createContext<WebSocketContextType>({
@@ -14,6 +16,8 @@ const WebSocketContext = createContext<WebSocketContextType>({
   pallets: [],
   userCount: 0,
   lastSync: new Date(),
+  clientId: null,
+  getConnectedClients: () => {},
 });
 
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -28,7 +32,15 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const [pallets, setPallets] = useState<PalletWithLots[]>([]);
   const [userCount, setUserCount] = useState(0);
   const [lastSync, setLastSync] = useState(new Date());
+  const [clientId, setClientId] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Function to request the list of connected clients
+  const getConnectedClients = useCallback(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'getConnectedClients' }));
+    }
+  }, [socket]);
 
   useEffect(() => {
     // Create WebSocket connection
@@ -72,6 +84,17 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           case 'init':
             setPallets(message.data.pallets);
             setUserCount(message.data.connectedUsers);
+            
+            // Save client ID from server
+            if (message.data.clientId) {
+              console.log('My client ID:', message.data.clientId);
+              setClientId(message.data.clientId);
+            }
+            break;
+            
+          case 'connectedClients':
+            // This message will be handled by the modal directly
+            // through the fetch call and doesn't need state management here
             break;
             
           case 'userCount':
@@ -174,7 +197,14 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   }, []);
 
   return (
-    <WebSocketContext.Provider value={{ connected, pallets, userCount, lastSync }}>
+    <WebSocketContext.Provider value={{ 
+      connected, 
+      pallets, 
+      userCount, 
+      lastSync, 
+      clientId,
+      getConnectedClients
+    }}>
       {children}
     </WebSocketContext.Provider>
   );
