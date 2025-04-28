@@ -71,5 +71,9 @@ export const unitSchema = z.enum(["KGS", "LBS"]);
 export type Unit = z.infer<typeof unitSchema>;
 
 // Transaction type
-export const transactionTypeSchema = z.enum(["pick", "add", "return", "edit"]);
+export const transactionTypeSchema = z.enum(["pick", "add", "return", "edit", "archive"]);
 export type TransactionType = z.infer<typeof transactionTypeSchema>;
+
+// Pallet status type
+export const palletStatusSchema = z.enum(["active", "archived", "damaged"]);
+export type PalletStatus = z.infer<typeof palletStatusSchema>;
