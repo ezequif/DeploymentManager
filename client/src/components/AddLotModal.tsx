@@ -42,24 +42,15 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
         throw new Error("Please fill in all required fields");
       }
 
-      // *** IMPORTANT FIX: Add one day to compensate for timezone shift ***
-      // Parse the date parts
-      const [year, month, day] = expirationDate.split('-').map(Number);
-      
-      // Create a date object and add one day
-      const fixedDate = new Date(Date.UTC(year, month - 1, day + 1));
-      
-      // Format back to YYYY-MM-DD
-      const fixedDateStr = fixedDate.toISOString().split('T')[0];
-      
-      console.log("Original date:", expirationDate, "Fixed date (with +1 day):", fixedDateStr);
+      // Use the date directly without any adjustment
+      console.log("Using date directly:", expirationDate);
 
       return apiRequest("POST", "/api/lots", {
         palletId: pallet.id,
         lotNumber,
         quantity,
         unit,
-        expirationDate: fixedDateStr,
+        expirationDate: expirationDate,
         transaction: {
           lotId: 0, // This will be replaced with the actual lot ID on the server
           transactionType: "add",
@@ -102,23 +93,14 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
       // Only record a transaction if the quantity has changed
       const hasQuantityChanged = existingLot.quantity !== quantity;
       
-      // *** IMPORTANT FIX: Add one day to compensate for timezone shift ***
-      // Parse the date parts
-      const [year, month, day] = expirationDate.split('-').map(Number);
-      
-      // Create a date object and add one day
-      const fixedDate = new Date(Date.UTC(year, month - 1, day + 1));
-      
-      // Format back to YYYY-MM-DD
-      const fixedDateStr = fixedDate.toISOString().split('T')[0];
-      
-      console.log("Original date:", expirationDate, "Fixed date (with +1 day):", fixedDateStr);
+      // Use the date directly without any adjustment
+      console.log("Using date directly:", expirationDate);
 
       return apiRequest("PATCH", `/api/lots/${existingLot.id}`, {
         lotNumber,
         quantity,
         unit,
-        expirationDate: fixedDateStr,
+        expirationDate: expirationDate,
         transaction: hasQuantityChanged ? {
           lotId: existingLot.id,
           transactionType: "edit",

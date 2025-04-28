@@ -37,23 +37,14 @@ export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotMo
         throw new Error("Please fill in all required fields");
       }
 
-      // *** IMPORTANT FIX: Add one day to compensate for timezone shift ***
-      // Parse the date parts
-      const [year, month, day] = expirationDate.split('-').map(Number);
-      
-      // Create a date object and add one day
-      const fixedDate = new Date(Date.UTC(year, month - 1, day + 1));
-      
-      // Format back to YYYY-MM-DD
-      const fixedDateStr = fixedDate.toISOString().split('T')[0];
-      
-      console.log("Original date:", expirationDate, "Fixed date (with +1 day):", fixedDateStr);
+      // Use the date directly without any adjustment
+      console.log("Using date directly:", expirationDate);
 
       return apiRequest("PATCH", `/api/lots/${lot.id}`, {
         lotNumber,
         quantity,
         unit,
-        expirationDate: fixedDateStr,
+        expirationDate: expirationDate,
       });
     },
     onSuccess: () => {
