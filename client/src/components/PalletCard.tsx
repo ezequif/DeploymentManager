@@ -525,7 +525,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Archive Pallet</AlertDialogTitle>
             <AlertDialogDescription>
-              {sortedLots.length === 0 ? (
+              {sortedLots.length === 0 || sortedLots.every(lot => lot.quantity <= 0) ? (
                 <p>Are you sure you want to archive this empty pallet? This will move it to the archived status.</p>
               ) : (
                 <p className="text-red-600">
@@ -536,7 +536,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            {sortedLots.length === 0 && (
+            {(sortedLots.length === 0 || sortedLots.every(lot => lot.quantity <= 0)) && (
               <AlertDialogAction 
                 onClick={() => archivePallet.mutate('')}
                 disabled={archivePallet.isPending}
