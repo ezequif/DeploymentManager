@@ -37,15 +37,23 @@ export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotMo
         throw new Error("Please fill in all required fields");
       }
 
-      // Normalize date to prevent timezone issues
-      const normalizedDate = normalizeDate(expirationDate);
-      console.log("Original date:", expirationDate, "Normalized date:", normalizedDate);
+      // *** IMPORTANT FIX: Add one day to compensate for timezone shift ***
+      // Parse the date parts
+      const [year, month, day] = expirationDate.split('-').map(Number);
+      
+      // Create a date object and add one day
+      const fixedDate = new Date(Date.UTC(year, month - 1, day + 1));
+      
+      // Format back to YYYY-MM-DD
+      const fixedDateStr = fixedDate.toISOString().split('T')[0];
+      
+      console.log("Original date:", expirationDate, "Fixed date (with +1 day):", fixedDateStr);
 
       return apiRequest("PATCH", `/api/lots/${lot.id}`, {
         lotNumber,
         quantity,
         unit,
-        expirationDate: normalizedDate,
+        expirationDate: fixedDateStr,
       });
     },
     onSuccess: () => {
@@ -156,8 +164,16 @@ export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotMo
                     id="expirationDate"
                     type="date"
                     value={expirationDate}
-                    onChange={(e) => setExpirationDate(e.target.value)}
+                    onChange={(e) => {
+                      // Force direct string assignment without any Date conversion
+                      // This preserves exactly what the user entered
+                      console.log("Date input raw value:", e.target.value);
+                      setExpirationDate(e.target.value); 
+                    }}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Raw date value: {expirationDate}
+                  </p>
                 </div>
               </div>
             </div>
