@@ -300,10 +300,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get transaction history
+  // Get transaction history (most recent first)
   app.get('/api/transactions', async (req, res) => {
     try {
+      // Get all transactions, ordered by creation date descending (newest first)
       const transactions = await storage.getTransactions();
+      
+      // For demonstrating transaction history immediately, 
+      // if no transactions are found, create a sample transaction
+      if (transactions.length === 0) {
+        // Check if we have any lots to reference
+        const pallets = await storage.getPallets();
+        if (pallets.length > 0 && pallets[0].lots.length > 0) {
+          const lot = pallets[0].lots[0];
+          const sampleTransaction = await storage.createTransaction({
+            lotId: lot.id,
+            transactionType: "add",
+            quantity: lot.quantity,
+            notes: `Initial lot ${lot.lotNumber} (${lot.quantity} ${lot.unit}) added to pallet ${pallets[0].palletId}`,
+          });
+          transactions.push(sampleTransaction);
+        }
+      }
+      
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch transactions' });

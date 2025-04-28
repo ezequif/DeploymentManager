@@ -49,7 +49,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
           lotId: 0, // This will be replaced with the actual lot ID on the server
           transactionType: "add",
           quantity: quantity,
-          notes: `Added to pallet ${pallet.palletId}`
+          notes: `Added lot ${lotNumber} (${quantity} ${unit}) to pallet ${pallet.palletId}`
         }
       });
     },
