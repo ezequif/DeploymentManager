@@ -11,13 +11,14 @@ import AddLotModal from "./AddLotModal";
 import { 
   PrinterIcon, EditIcon, MoreVerticalIcon, CheckIcon, XIcon,
   PackageIcon, MapPinIcon, AlertTriangleIcon, AlertCircleIcon, PlusIcon,
-  ArchiveIcon
+  ArchiveIcon, Trash2Icon
 } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -127,9 +128,39 @@ export default function PalletCard({ pallet }: PalletCardProps) {
     }
   });
   
+  // Delete pallet mutation
+  const deletePallet = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/pallets/${pallet.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
+      toast({
+        title: "Pallet deleted",
+        description: `Pallet ${pallet.palletId} has been permanently deleted.`,
+        variant: "destructive"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting pallet",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Handle archive pallet
   const handleArchivePallet = () => {
     setIsArchiveDialogOpen(true);
+  };
+  
+  // Handle delete pallet
+  const handleDeletePallet = () => {
+    // Use browser's confirm dialog for delete confirmation
+    if (window.confirm(`Are you sure you want to permanently delete pallet ${pallet.palletId}?\n\nThis will delete all lots and transaction history associated with this pallet and cannot be undone.`)) {
+      deletePallet.mutate();
+    }
   };
   
   // Handle print label
@@ -283,6 +314,14 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                         Archive Pallet
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      className="cursor-pointer flex items-center text-destructive"
+                      onClick={() => handleDeletePallet()}
+                    >
+                      <Trash2Icon className="h-4 w-4 mr-2" />
+                      Delete Permanently
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
