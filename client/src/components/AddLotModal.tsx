@@ -45,10 +45,17 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
         quantity,
         unit,
         expirationDate,
+        transaction: {
+          lotId: 0, // This will be replaced with the actual lot ID on the server
+          transactionType: "add",
+          quantity: quantity,
+          notes: `Added to pallet ${pallet.palletId}`
+        }
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/pallets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
         title: "Lot Added",
         description: `Lot ${lotNumber} has been added to pallet ${pallet.palletId}.`,
@@ -77,15 +84,25 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
         throw new Error("Please fill in all required fields");
       }
 
+      // Only record a transaction if the quantity has changed
+      const hasQuantityChanged = existingLot.quantity !== quantity;
+      
       return apiRequest("PATCH", `/api/lots/${existingLot.id}`, {
         lotNumber,
         quantity,
         unit,
         expirationDate,
+        transaction: hasQuantityChanged ? {
+          lotId: existingLot.id,
+          transactionType: "edit",
+          quantity: quantity - existingLot.quantity, // Could be negative (decrease) or positive (increase)
+          notes: `Edited lot ${lotNumber} quantity from ${existingLot.quantity} to ${quantity} ${unit}`
+        } : undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/pallets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
         title: "Lot Updated",
         description: `Lot ${lotNumber} has been updated successfully.`,

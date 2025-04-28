@@ -49,6 +49,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       toast({
         title: "Lot picked",
         description: `Successfully picked ${quantity} ${lot.unit} from lot ${lot.lotNumber}`
