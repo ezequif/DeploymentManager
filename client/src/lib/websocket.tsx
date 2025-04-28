@@ -39,19 +39,12 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     ws.onopen = () => {
       setConnected(true);
       setLastSync(new Date());
-      toast({
-        title: 'Connected to server',
-        description: 'Real-time updates are now enabled.',
-      });
+      // Silently connect without a toast notification
     };
 
     ws.onclose = () => {
       setConnected(false);
-      toast({
-        title: 'Disconnected from server',
-        description: 'Trying to reconnect...',
-        variant: 'destructive',
-      });
+      // Silently try to reconnect without a toast notification
       
       // Try to reconnect after 1 second
       setTimeout(() => {
@@ -67,11 +60,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      toast({
-        title: 'Connection error',
-        description: 'Could not connect to the server.',
-        variant: 'destructive',
-      });
+      // Silently handle error without a toast notification
     };
 
     ws.onmessage = (event) => {
