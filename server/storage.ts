@@ -2,7 +2,7 @@ import {
   pallets, Pallet, InsertPallet, 
   lots, Lot, InsertLot,
   transactions, Transaction, InsertTransaction,
-  PalletWithLots 
+  PalletWithLots, PalletStatus
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
@@ -45,7 +45,9 @@ export class DatabaseStorage implements IStorage {
     
     return Promise.all(palletsData.map(async pallet => {
       const lotsData = await this.getLots(pallet.id);
-      return { ...pallet, lots: lotsData };
+      // Cast status to PalletStatus
+      const status = pallet.status as PalletStatus;
+      return { ...pallet, lots: lotsData, status };
     }));
   }
   
@@ -101,7 +103,9 @@ export class DatabaseStorage implements IStorage {
     if (!pallet) return undefined;
 
     const lotsData = await this.getLots(id);
-    return { ...pallet, lots: lotsData };
+    // Cast status to PalletStatus
+    const status = pallet.status as PalletStatus;
+    return { ...pallet, lots: lotsData, status };
   }
 
   async getPalletByPalletId(palletId: string): Promise<PalletWithLots | undefined> {
@@ -109,7 +113,9 @@ export class DatabaseStorage implements IStorage {
     if (!pallet) return undefined;
 
     const lotsData = await this.getLots(pallet.id);
-    return { ...pallet, lots: lotsData };
+    // Cast status to PalletStatus
+    const status = pallet.status as PalletStatus;
+    return { ...pallet, lots: lotsData, status };
   }
 
   async createPallet(pallet: InsertPallet): Promise<Pallet> {
