@@ -273,20 +273,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const palletId = updatedLot.palletId;
       
-      // If quantity is 0 or less, delete the lot
+      // If quantity is 0 or less, we'll mark it as zero but not delete it
+      // due to foreign key constraints with transactions
       if (updatedLot.quantity <= 0) {
-        const lotDeleted = await storage.deleteLot(id);
-        console.log(`Lot ${id} deleted: ${lotDeleted}`);
+        console.log(`Lot ${id} has zero quantity.`);
         
-        // Get updated pallet with lots after deletion
+        // Get updated pallet with lots 
         const pallet = await storage.getPallet(palletId);
         
-        // Broadcast lot deletion
+        // Broadcast lot update with zero quantity
         broadcast({
-          type: 'lotDeleted',
+          type: 'lotUpdated',
           data: {
-            lotId: id,
+            lot: updatedLot,
             pallet
+          }
+        });
+        
+        // Add a toast notification about empty lot
+        broadcast({
+          type: 'notification',
+          data: {
+            title: 'Lot Empty',
+            description: `Lot ${updatedLot.lotNumber} is now empty.`
           }
         });
       } else {

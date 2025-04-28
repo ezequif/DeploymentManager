@@ -333,7 +333,9 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                     <div
                       key={lot.id}
                       className={`p-4 rounded-lg border ${
-                        isExpiredFlag
+                        lot.quantity <= 0
+                          ? "bg-gray-100 border-gray-200 opacity-70"
+                          : isExpiredFlag
                           ? "bg-red-50 border-red-200"
                           : isExpiringSoonFlag
                           ? "bg-amber-50 border-amber-200"
@@ -370,10 +372,15 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                       
                       <div className="flex space-x-2">
                         <button
-                          className="flex-1 bg-secondary text-white py-3 px-4 rounded-lg font-medium text-base"
-                          onClick={() => handlePickLot(lot)}
+                          className={`flex-1 py-3 px-4 rounded-lg font-medium text-base ${
+                            lot.quantity <= 0 
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                              : "bg-secondary text-white"
+                          }`}
+                          onClick={() => lot.quantity > 0 && handlePickLot(lot)}
+                          disabled={lot.quantity <= 0}
                         >
-                          Pick
+                          {lot.quantity <= 0 ? "Empty" : "Pick"}
                         </button>
                         <button
                           className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium text-base"
@@ -420,7 +427,15 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                       return (
                         <tr 
                           key={lot.id} 
-                          className={isExpiredFlag ? "bg-red-50" : isExpiringSoonFlag ? "expiring-soon" : ""}
+                          className={
+                            lot.quantity <= 0 
+                              ? "bg-gray-100 opacity-70" 
+                              : isExpiredFlag 
+                                ? "bg-red-50" 
+                                : isExpiringSoonFlag 
+                                  ? "expiring-soon" 
+                                  : ""
+                          }
                         >
                           <td className="px-3 py-3 text-sm text-gray-900">{lot.lotNumber}</td>
                           <td className="px-3 py-3 text-sm font-bold text-gray-900">{formatQuantity(lot.quantity)}</td>

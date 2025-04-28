@@ -142,6 +142,13 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             });
             break;
             
+          case 'notification':
+            toast({
+              title: message.data.title,
+              description: message.data.description,
+            });
+            break;
+            
           default:
             console.log('Unknown message type:', message.type);
         }
