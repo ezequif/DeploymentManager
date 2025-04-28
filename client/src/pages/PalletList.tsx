@@ -73,86 +73,90 @@ export default function PalletList() {
   return (
     <>
       {/* Action Bar */}
-      <div className="bg-white px-4 py-3 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 shadow-sm">
-        <div className="w-full sm:max-w-md">
-          <div className="relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-              <span className="material-icons text-gray-400">search</span>
-            </span>
-            <Input
-              type="text"
-              placeholder="Search pallets, RM#, location..."
-              className="w-full pl-10 pr-4 py-2"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <div className="bg-white px-4 py-3 flex flex-col justify-between items-center space-y-3 shadow-sm">
+        {/* Status Tabs - Full Width on Mobile */}
+        <div className="w-full overflow-x-auto pb-2">
+          <div className="flex rounded-md overflow-hidden border border-gray-200 min-w-max mx-auto">
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`px-4 py-2 text-sm font-medium ${
+                statusFilter === "all"
+                  ? "bg-primary text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              All
+              <Badge className="ml-2 bg-gray-200 text-gray-800">
+                {pallets.length}
+              </Badge>
+            </button>
+            <button
+              onClick={() => setStatusFilter("active")}
+              className={`px-4 py-2 text-sm font-medium ${
+                statusFilter === "active"
+                  ? "bg-primary text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Active
+              <Badge className="ml-2 bg-primary-light">
+                {pallets.filter(p => p.status === "active").length}
+              </Badge>
+            </button>
+            <button
+              onClick={() => setStatusFilter("archived")}
+              className={`px-4 py-2 text-sm font-medium ${
+                statusFilter === "archived"
+                  ? "bg-amber-500 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Archived
+              <Badge className="ml-2 bg-amber-500 text-white">
+                {pallets.filter(p => p.status === "archived").length}
+              </Badge>
+            </button>
+            <button
+              onClick={() => setStatusFilter("damaged")}
+              className={`px-4 py-2 text-sm font-medium ${
+                statusFilter === "damaged"
+                  ? "bg-red-500 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Damaged
+              <Badge className="ml-2 bg-red-500 text-white">
+                {pallets.filter(p => p.status === "damaged").length}
+              </Badge>
+            </button>
           </div>
         </div>
-        <div className="flex space-x-3">
-          <div className="relative">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <FilterIcon className="h-4 w-4" />
-                  <span>Status: </span>
-                  <span className="font-medium">
-                    {statusFilter === "all" ? "All" : 
-                     statusFilter === "active" ? "Active" :
-                     statusFilter === "archived" ? "Archived" : "Damaged"}
-                  </span>
-                  {statusFilter !== "all" && (
-                    <Badge className={`ml-1 ${
-                      statusFilter === "active" ? "bg-primary-light" :
-                      statusFilter === "archived" ? "bg-amber-500" : "bg-red-500"
-                    }`}>
-                      {filteredPallets.length}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuRadioGroup 
-                  value={statusFilter} 
-                  onValueChange={(value) => setStatusFilter(value as PalletStatus | "all")}
-                >
-                  <DropdownMenuRadioItem value="all" className="cursor-pointer">
-                    <span className="font-medium">All Pallets</span>
-                    <Badge className="ml-auto bg-gray-200 text-gray-800">
-                      {pallets.length}
-                    </Badge>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="active" className="cursor-pointer">
-                    <span className="font-medium">Active</span>
-                    <Badge className="ml-auto bg-primary-light">
-                      {pallets.filter(p => p.status === "active").length}
-                    </Badge>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="archived" className="cursor-pointer">
-                    <span className="font-medium">Archived</span>
-                    <Badge className="ml-auto bg-amber-500">
-                      {pallets.filter(p => p.status === "archived").length}
-                    </Badge>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="damaged" className="cursor-pointer">
-                    <span className="font-medium">Damaged</span>
-                    <Badge className="ml-auto bg-red-500">
-                      {pallets.filter(p => p.status === "damaged").length}
-                    </Badge>
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        
+        {/* Search and Actions - Row on larger screens */}
+        <div className="w-full flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
+          <div className="w-full sm:max-w-md">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="material-icons text-gray-400">search</span>
+              </span>
+              <Input
+                type="text"
+                placeholder="Search pallets, RM#, location..."
+                className="w-full pl-10 pr-4 py-2"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
-          <Button 
-            className="bg-primary hover:bg-primary-dark text-white flex items-center"
-            onClick={() => setIsNewPalletModalOpen(true)}
-          >
-            <span className="material-icons mr-1">add</span>
-            New Pallet
-          </Button>
+          <div>
+            <Button 
+              className="bg-primary hover:bg-primary-dark text-white flex items-center w-full sm:w-auto"
+              onClick={() => setIsNewPalletModalOpen(true)}
+            >
+              <span className="material-icons mr-1">add</span>
+              New Pallet
+            </Button>
+          </div>
         </div>
       </div>
 
