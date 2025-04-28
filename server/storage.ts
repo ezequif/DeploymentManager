@@ -33,9 +33,53 @@ export interface IStorage {
   // Utility
   generatePalletId(): Promise<string>;
   isPalletEmpty(palletId: number): Promise<boolean>;
+  
+  // FIFO/FEFO Checks
+  findOlderLotsWithSameRM(rmNumber: string, excludePalletId?: string): Promise<Array<{pallet: Pallet, lot: Lot}>>;
 }
 
 export class DatabaseStorage implements IStorage {
+  async findOlderLotsWithSameRM(rmNumber: string, excludePalletId?: string): Promise<Array<{pallet: Pallet, lot: Lot}>> {
+    const palletsWithSameRM = await db
+      .select()
+      .from(pallets)
+      .where(eq(pallets.rmNumber, rmNumber))
+      .orderBy(asc(pallets.createdAt));
+      
+    // Build results
+    const results: Array<{pallet: Pallet, lot: Lot}> = [];
+    
+    for (const pallet of palletsWithSameRM) {
+      // Skip if this is the pallet we're excluding
+      if (excludePalletId && pallet.palletId === excludePalletId) {
+        continue;
+      }
+      
+      // Only include active pallets
+      if (pallet.status !== "active") {
+        continue;
+      }
+      
+      // Get lots for this pallet that have quantity > 0
+      const activeLots = await db
+        .select()
+        .from(lots)
+        .where(eq(lots.palletId, pallet.id))
+        .orderBy(asc(lots.expirationDate));
+        
+      // Add each lot with its parent pallet to results
+      for (const lot of activeLots) {
+        if (lot.quantity > 0) {
+          results.push({
+            pallet,
+            lot
+          });
+        }
+      }
+    }
+    
+    return results;
+  }
   async getPallets(statusFilter?: string): Promise<PalletWithLots[]> {
     let query = db.select().from(pallets);
     
