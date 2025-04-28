@@ -239,25 +239,43 @@ export class DatabaseStorage implements IStorage {
     // If expirationDate is provided, ensure it's properly formatted
     // This prevents timezone issues when dates are saved
     if (lot.expirationDate) {
-      // Log the date for debugging
-      console.log("Create lot - original date from client:", lot.expirationDate);
-      
-      // Directly use the date string without any conversion
-      // Database stores it as text, so no need for Date objects
-      
-      // If the date doesn't include a timezone specifier, treat it as local time
-      // This prevents unwanted timezone conversions
-      if (lot.expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Already in YYYY-MM-DD format, keep as is
-        console.log("Date is already in YYYY-MM-DD format, keeping as is:", lot.expirationDate);
-      } else {
-        // Convert to YYYY-MM-DD format
-        const date = new Date(lot.expirationDate);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        lot.expirationDate = `${year}-${month}-${day}`;
-        console.log("Normalized date to YYYY-MM-DD format:", lot.expirationDate);
+      try {
+        // Log the date for debugging
+        console.log("Create lot - original date from client:", lot.expirationDate);
+        
+        // Always store dates in YYYY-MM-DD format without timezone conversion
+        // The date string is treated as UTC date components to avoid timezone issues
+        if (lot.expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          // Already in YYYY-MM-DD format, keep as is but log it
+          console.log("Using date directly as provided:", lot.expirationDate);
+        } else {
+          // For non-standard formats, parse and normalize to YYYY-MM-DD in UTC
+          const parts = lot.expirationDate.split(/[-/]/);
+          if (parts.length === 3) {
+            // Try to parse as either YYYY-MM-DD or MM-DD-YYYY or similar
+            let year, month, day;
+            
+            // Check if first part might be year (4 digits)
+            if (parts[0].length === 4) {
+              [year, month, day] = parts;
+            } else {
+              // Assume MM-DD-YYYY format
+              [month, day, year] = parts;
+            }
+            
+            // Ensure we have numbers
+            year = parseInt(year, 10);
+            month = parseInt(month, 10);
+            day = parseInt(day, 10);
+            
+            // Format with padding
+            const padded = (num: number) => num.toString().padStart(2, '0');
+            lot.expirationDate = `${year}-${padded(month)}-${padded(day)}`;
+            console.log("Parsed and normalized date to:", lot.expirationDate);
+          }
+        }
+      } catch (error) {
+        console.error("Error processing date:", error);
       }
     }
     
@@ -269,27 +287,43 @@ export class DatabaseStorage implements IStorage {
     // If expirationDate is provided, ensure it's properly formatted
     // This prevents timezone issues when dates are saved
     if (lot.expirationDate) {
-      // Extract the date portion only to prevent timezone issues
       try {
         // Log the date for debugging
         console.log("Update lot - original date from client:", lot.expirationDate);
         
-        // If the date doesn't include a timezone specifier, treat it as local time
-        // This prevents unwanted timezone conversions
+        // Always store dates in YYYY-MM-DD format without timezone conversion
+        // The date string is treated as UTC date components to avoid timezone issues
         if (lot.expirationDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          // Already in YYYY-MM-DD format, keep as is
-          console.log("Date is already in YYYY-MM-DD format, keeping as is:", lot.expirationDate);
+          // Already in YYYY-MM-DD format, keep as is but log it
+          console.log("Using date directly as provided:", lot.expirationDate);
         } else {
-          // Convert to YYYY-MM-DD format
-          const date = new Date(lot.expirationDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          lot.expirationDate = `${year}-${month}-${day}`;
-          console.log("Normalized date to YYYY-MM-DD format:", lot.expirationDate);
+          // For non-standard formats, parse and normalize to YYYY-MM-DD in UTC
+          const parts = lot.expirationDate.split(/[-/]/);
+          if (parts.length === 3) {
+            // Try to parse as either YYYY-MM-DD or MM-DD-YYYY or similar
+            let year, month, day;
+            
+            // Check if first part might be year (4 digits)
+            if (parts[0].length === 4) {
+              [year, month, day] = parts;
+            } else {
+              // Assume MM-DD-YYYY format
+              [month, day, year] = parts;
+            }
+            
+            // Ensure we have numbers
+            year = parseInt(year, 10);
+            month = parseInt(month, 10);
+            day = parseInt(day, 10);
+            
+            // Format with padding
+            const padded = (num: number) => num.toString().padStart(2, '0');
+            lot.expirationDate = `${year}-${padded(month)}-${padded(day)}`;
+            console.log("Parsed and normalized date to:", lot.expirationDate);
+          }
         }
       } catch (error) {
-        console.error("Error normalizing date:", error);
+        console.error("Error processing date:", error);
       }
     }
     

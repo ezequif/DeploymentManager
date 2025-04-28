@@ -70,28 +70,36 @@ export function formatElapsedTime(date: Date): string {
 
 /**
  * Normalize date string to YYYY-MM-DD format for consistent storage
- * This prevents timezone issues when storing dates
+ * This function handles timezone issues by explicitly setting the date
+ * to preserve the exact date chosen by the user, regardless of timezone.
  * 
- * @param dateString Date string in any format that JavaScript can parse
+ * @param dateString Date string in any format that JavaScript can parse (preferably YYYY-MM-DD)
  * @returns Normalized date string in YYYY-MM-DD format
  */
 export function normalizeDate(dateString: string): string {
-  // If it's already in YYYY-MM-DD format, return as is
+  // If it's already in YYYY-MM-DD format, parse it directly
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    return dateString;
+    const [year, month, day] = dateString.split('-').map(n => parseInt(n, 10));
+    
+    // Build the date using UTC to avoid timezone shifts
+    // We subtract 1 from month because JS months are 0-indexed
+    const utcDate = new Date(Date.UTC(year, month - 1, day));
+    
+    // Format it back to YYYY-MM-DD
+    const pad = (num: number) => num.toString().padStart(2, '0');
+    return `${utcDate.getUTCFullYear()}-${pad(utcDate.getUTCMonth() + 1)}-${pad(utcDate.getUTCDate())}`;
   }
   
   try {
-    // Create a date object but force it to be interpreted in local timezone
+    // For other formats, first convert to a Date
     const date = new Date(dateString);
     
-    // Extract the year, month, and day separately
-    const year = date.getFullYear();
-    // getMonth() is zero-based, so add 1
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
+    // Then get the UTC components
+    const year = date.getUTCFullYear();
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = date.getUTCDate().toString().padStart(2, '0');
     
-    // Return the date in ISO format (YYYY-MM-DD)
+    // Return the date in ISO format (YYYY-MM-DD) using UTC values
     return `${year}-${month}-${day}`;
   } catch (error) {
     console.error("Error normalizing date:", error);
