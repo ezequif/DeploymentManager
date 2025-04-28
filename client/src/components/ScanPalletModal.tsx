@@ -32,6 +32,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
 
   // Define the extended type including FIFO check results
   type PalletWithFIFOCheck = PalletWithLots & {
+    status: string;
     fifoCheck?: {
       hasOlderLots: boolean;
       olderLots: Array<{pallet: Pallet, lot: Lot}>;
@@ -54,6 +55,9 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
     },
     enabled: scanned && !!palletId,
     retry: false,
+    // Disable caching to always show fresh data when scanning
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Handle scanner results
@@ -61,6 +65,8 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
     setPalletId(result);
     setIsScannerOpen(false);
     setScanned(true);
+    // Force refetch to ensure latest data
+    setTimeout(() => refetch(), 100);
   };
 
   // Handle manual search
@@ -74,6 +80,8 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
       return;
     }
     setScanned(true);
+    // Force refetch to ensure latest data
+    setTimeout(() => refetch(), 100);
   };
 
   // Reset form when closing
