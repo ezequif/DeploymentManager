@@ -7,10 +7,26 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { PalletWithLots } from "@shared/schema";
+import { z } from "zod";
+
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuRadioGroup, 
+  DropdownMenuRadioItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { FilterIcon, CheckIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+// Define status types locally to avoid import issues
+// These must match the schema values
+type PalletStatus = "active" | "archived" | "damaged";
 
 export default function PalletList() {
   const { connected } = useWebSocket();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PalletStatus | "all">("all");
   const [isNewPalletModalOpen, setIsNewPalletModalOpen] = useState(false);
   const { toast } = useToast();
   
@@ -37,15 +53,21 @@ export default function PalletList() {
     }
   }, [apiPallets, wsPallets]);
   
-  // Filter pallets based on search term
+  // Filter pallets based on search term and status
   const filteredPallets = pallets.filter(pallet => {
+    // Apply search term filter
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       pallet.palletId.toLowerCase().includes(searchLower) ||
       pallet.rmNumber.toLowerCase().includes(searchLower) ||
       pallet.location.toLowerCase().includes(searchLower) ||
       pallet.lots.some(lot => lot.lotNumber.toLowerCase().includes(searchLower))
     );
+    
+    // Apply status filter
+    const matchesStatus = statusFilter === "all" || pallet.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
   
   return (
@@ -68,14 +90,61 @@ export default function PalletList() {
         </div>
         <div className="flex space-x-3">
           <div className="relative">
-            <Button
-              variant="outline"
-              className="flex items-center"
-              onClick={() => toast({ title: "Filter", description: "Filter functionality would be implemented here" })}
-            >
-              <span className="material-icons mr-1">filter_list</span>
-              Filter
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <FilterIcon className="h-4 w-4" />
+                  <span>Status: </span>
+                  <span className="font-medium">
+                    {statusFilter === "all" ? "All" : 
+                     statusFilter === "active" ? "Active" :
+                     statusFilter === "archived" ? "Archived" : "Damaged"}
+                  </span>
+                  {statusFilter !== "all" && (
+                    <Badge className={`ml-1 ${
+                      statusFilter === "active" ? "bg-primary-light" :
+                      statusFilter === "archived" ? "bg-amber-500" : "bg-red-500"
+                    }`}>
+                      {filteredPallets.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuRadioGroup 
+                  value={statusFilter} 
+                  onValueChange={(value) => setStatusFilter(value as PalletStatus | "all")}
+                >
+                  <DropdownMenuRadioItem value="all" className="cursor-pointer">
+                    <span className="font-medium">All Pallets</span>
+                    <Badge className="ml-auto bg-gray-200 text-gray-800">
+                      {pallets.length}
+                    </Badge>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="active" className="cursor-pointer">
+                    <span className="font-medium">Active</span>
+                    <Badge className="ml-auto bg-primary-light">
+                      {pallets.filter(p => p.status === "active").length}
+                    </Badge>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="archived" className="cursor-pointer">
+                    <span className="font-medium">Archived</span>
+                    <Badge className="ml-auto bg-amber-500">
+                      {pallets.filter(p => p.status === "archived").length}
+                    </Badge>
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="damaged" className="cursor-pointer">
+                    <span className="font-medium">Damaged</span>
+                    <Badge className="ml-auto bg-red-500">
+                      {pallets.filter(p => p.status === "damaged").length}
+                    </Badge>
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Button 
             className="bg-primary hover:bg-primary-dark text-white flex items-center"
@@ -117,11 +186,13 @@ export default function PalletList() {
             <span className="material-icons text-gray-400 text-5xl mb-3">inventory</span>
             <h3 className="text-lg font-medium text-gray-800 mb-1">No pallets found</h3>
             <p className="text-gray-500 mb-4">
-              {searchTerm ? 
-                `No pallets matching "${searchTerm}" were found.` : 
-                "You haven't created any pallets yet."}
+              {searchTerm 
+                ? `No pallets matching "${searchTerm}" were found.`
+                : statusFilter !== "all"
+                  ? `No ${statusFilter} pallets found. Try a different filter.`
+                  : "You haven't created any pallets yet."}
             </p>
-            {!searchTerm && (
+            {!searchTerm && statusFilter === "all" && (
               <Button 
                 onClick={() => setIsNewPalletModalOpen(true)}
                 className="inline-flex items-center"
