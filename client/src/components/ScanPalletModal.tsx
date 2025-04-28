@@ -19,6 +19,16 @@ import PickModal from "./PickModal";
 import { printPalletLabel } from "@/lib/barcodeUtils";
 import { formatDate, formatDateTime, formatQuantity, isExpired, isExpiringSoon } from "@/lib/formatUtils";
 import { PalletWithLots, Lot, Pallet } from "@shared/schema";
+import { 
+  Search, 
+  QrCode, 
+  AlertTriangle, 
+  AlertCircle,
+  Package2, 
+  Printer, 
+  Calendar, 
+  ShoppingCart
+} from "lucide-react";
 
 interface ScanPalletModalProps {
   isOpen: boolean;
