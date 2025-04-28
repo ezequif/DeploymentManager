@@ -46,7 +46,10 @@ export default function PalletList() {
   });
   
   // Also use WebSocket pallets as a backup/realtime source
-  const { pallets: wsPallets } = useWebSocket();
+  const { pallets: wsOriginalPallets } = useWebSocket();
+  
+  // Cast the websocket pallets to include status property
+  const wsPallets = wsOriginalPallets as PalletWithStatus[];
   
   // Function to open scan pallet modal
   const openScanPalletModal = () => {
@@ -70,8 +73,11 @@ export default function PalletList() {
     }
   }, [apiPallets, wsPallets]);
   
+  // Cast pallets to the type with status property
+  const typedPallets = pallets as PalletWithStatus[];
+  
   // Filter pallets based on search term and status
-  const filteredPallets = pallets.filter(pallet => {
+  const filteredPallets = typedPallets.filter(pallet => {
     // Apply search term filter
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = (
@@ -136,7 +142,7 @@ export default function PalletList() {
             >
               Active
               <Badge className="ml-2 bg-primary-light">
-                {pallets.filter(p => p.status === "active").length}
+                {typedPallets.filter(p => p.status === "active").length}
               </Badge>
             </button>
             <button
@@ -149,7 +155,7 @@ export default function PalletList() {
             >
               Archived
               <Badge className="ml-2 bg-amber-500 text-white">
-                {pallets.filter(p => p.status === "archived").length}
+                {typedPallets.filter(p => p.status === "archived").length}
               </Badge>
             </button>
             <button
@@ -162,7 +168,7 @@ export default function PalletList() {
             >
               Damaged
               <Badge className="ml-2 bg-red-500 text-white">
-                {pallets.filter(p => p.status === "damaged").length}
+                {typedPallets.filter(p => p.status === "damaged").length}
               </Badge>
             </button>
           </div>
