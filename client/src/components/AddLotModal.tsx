@@ -32,6 +32,20 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
   
   const { toast } = useToast();
 
+  // Helper to preserve the date exactly as entered by the user
+  const normalizeDate = (dateString: string): string => {
+    // This ensures that dates entered by the user are preserved exactly as typed,
+    // preventing timezone offset issues
+    const parts = dateString.split('-');
+    if (parts.length !== 3) return dateString;
+    
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]);
+    const day = parseInt(parts[2]);
+    
+    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  };
+
   // Add lot mutation
   const addLotMutation = useMutation({
     mutationFn: async () => {
@@ -39,12 +53,16 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
         throw new Error("Please fill in all required fields");
       }
 
+      // Normalize date to prevent timezone issues
+      const normalizedDate = normalizeDate(expirationDate);
+      console.log("Original date:", expirationDate, "Normalized date:", normalizedDate);
+
       return apiRequest("POST", "/api/lots", {
         palletId: pallet.id,
         lotNumber,
         quantity,
         unit,
-        expirationDate,
+        expirationDate: normalizedDate,
         transaction: {
           lotId: 0, // This will be replaced with the actual lot ID on the server
           transactionType: "add",
@@ -87,11 +105,15 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
       // Only record a transaction if the quantity has changed
       const hasQuantityChanged = existingLot.quantity !== quantity;
       
+      // Normalize date to prevent timezone issues
+      const normalizedDate = normalizeDate(expirationDate);
+      console.log("Original date:", expirationDate, "Normalized date:", normalizedDate);
+
       return apiRequest("PATCH", `/api/lots/${existingLot.id}`, {
         lotNumber,
         quantity,
         unit,
-        expirationDate,
+        expirationDate: normalizedDate,
         transaction: hasQuantityChanged ? {
           lotId: existingLot.id,
           transactionType: "edit",
