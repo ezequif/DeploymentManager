@@ -292,7 +292,11 @@ export default function PalletCard({ pallet }: PalletCardProps) {
         <AddLotModal
           pallet={pallet}
           isOpen={isAddLotModalOpen}
-          onClose={() => setIsAddLotModalOpen(false)}
+          onClose={() => {
+            setIsAddLotModalOpen(false);
+            setEditingLot(null);
+          }}
+          existingLot={editingLot}
         />
       )}
     </>
