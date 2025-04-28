@@ -70,16 +70,24 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
       }
       return apiRequest("POST", "/api/pallets", data);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Pallet created successfully:", data);
+      // Invalidate all queries related to pallets to refresh the list
       queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
+      
+      // Force a direct refetch to ensure we get the latest data
+      queryClient.refetchQueries({ queryKey: ['/api/pallets'] });
+      
       toast({
         title: "Pallet created",
-        description: "New pallet has been created successfully",
+        description: `Pallet ${data.palletId} has been created successfully`,
       });
+      
       onClose();
       form.reset();
     },
     onError: (error) => {
+      console.error("Error creating pallet:", error);
       toast({
         title: "Error creating pallet",
         description: error.message,

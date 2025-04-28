@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useWebSocket } from "../lib/websocket";
 import PalletCard from "../components/PalletCard";
 import NewPalletModal from "../components/NewPalletModal";
@@ -22,19 +22,18 @@ export default function PalletList() {
   // Also use WebSocket pallets as a backup/realtime source
   const { pallets: wsPallets } = useWebSocket();
   
-  // Combine both sources, preferring API pallets but using WebSocket if available
-  const [pallets, setPallets] = useState<PalletWithLots[]>([]);
-  
-  useEffect(() => {
+  // Combine both sources, preferring API pallets but using WebSocket as backup
+  // Use useMemo instead of state to avoid infinite update loops
+  const pallets = useMemo(() => {
     if (apiPallets.length > 0) {
       console.log("Using API pallets:", apiPallets);
-      setPallets(apiPallets);
+      return apiPallets;
     } else if (wsPallets.length > 0) {
       console.log("Using WebSocket pallets:", wsPallets);
-      setPallets(wsPallets);
+      return wsPallets;
     } else {
       console.log("No pallets available");
-      setPallets([]);
+      return [];
     }
   }, [apiPallets, wsPallets]);
   
