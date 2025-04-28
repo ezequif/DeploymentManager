@@ -136,15 +136,32 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deletePallet(id: number): Promise<boolean> {
-    // First check if the pallet exists
-    const pallet = await this.getPallet(id);
-    if (!pallet) {
-      return false;
+    try {
+      console.log(`Attempting to delete pallet with ID: ${id}`);
+      
+      // First check if the pallet exists
+      const pallet = await this.getPallet(id);
+      if (!pallet) {
+        console.log(`Pallet with ID: ${id} not found`);
+        return false;
+      }
+      
+      console.log(`Found pallet to delete: ${pallet.palletId}`);
+      
+      // First delete related lots to avoid foreign key constraint issues
+      console.log(`Deleting lots for pallet ID: ${id}`);
+      await db.delete(lots).where(eq(lots.palletId, id));
+      
+      // Then delete the pallet
+      console.log(`Deleting pallet ID: ${id}`);
+      const result = await db.delete(pallets).where(eq(pallets.id, id)).returning();
+      
+      console.log(`Delete result: ${JSON.stringify(result)}`);
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting pallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
     }
-    
-    // Since we have cascade delete set up in the schema, this will also delete all lots
-    const result = await db.delete(pallets).where(eq(pallets.id, id)).returning();
-    return result.length > 0;
   }
 
   async getLots(palletId: number): Promise<Lot[]> {

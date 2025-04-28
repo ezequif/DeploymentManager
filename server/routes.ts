@@ -214,28 +214,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/pallets/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log(`DELETE request for pallet ID: ${id}`);
       
       // First get the pallet to store reference before deletion
       const palletToDelete = await storage.getPallet(id);
       if (!palletToDelete) {
+        console.log(`Pallet with ID ${id} not found for deletion`);
         return res.status(404).json({ message: 'Pallet not found' });
       }
       
-      const success = await storage.deletePallet(id);
+      console.log(`Attempting to delete pallet: ${palletToDelete.palletId}`);
       
-      if (success) {
-        // Broadcast pallet deletion
-        broadcast({
-          type: 'palletDeleted',
-          data: { id, palletId: palletToDelete.palletId }
-        });
+      try {
+        const success = await storage.deletePallet(id);
         
-        res.json({ message: 'Pallet deleted successfully', palletId: palletToDelete.palletId });
-      } else {
-        res.status(404).json({ message: 'Pallet not found' });
+        if (success) {
+          console.log(`Successfully deleted pallet: ${palletToDelete.palletId}`);
+          // Broadcast pallet deletion
+          broadcast({
+            type: 'palletDeleted',
+            data: { id, palletId: palletToDelete.palletId }
+          });
+          
+          return res.json({ message: 'Pallet deleted successfully', palletId: palletToDelete.palletId });
+        } else {
+          console.log(`Failed to delete pallet with ID: ${id}`);
+          return res.status(404).json({ message: 'Pallet not found' });
+        }
+      } catch (deleteError) {
+        console.error(`Error in deletePallet: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`);
+        if (deleteError instanceof Error) {
+          return res.status(400).json({ message: deleteError.message });
+        }
+        throw deleteError;
       }
     } catch (error) {
-      res.status(500).json({ message: 'Failed to delete pallet' });
+      console.error(`Unhandled error in DELETE /api/pallets/:id: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      res.status(500).json({ message: 'Failed to delete pallet', error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
