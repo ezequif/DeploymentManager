@@ -33,8 +33,9 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
       try {
         setIsLoading(true);
         // Check if there are older lots with the same RM number for FIFO checking
-        const response = await apiRequest("GET", `/api/fifo-check/${pallet.rmNumber}?excludePalletId=${pallet.palletId}`);
+        const response = await apiRequest("GET", `/api/pallets/older-lots/${pallet.rmNumber}?excludePalletId=${pallet.palletId}`);
         const data = await response.json();
+        console.log("FIFO check data:", data);
         setFifoCheck(data);
       } catch (error) {
         console.error("Error checking for older lots:", error);
