@@ -126,7 +126,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
               <div className="flex flex-col sm:flex-row sm:space-x-3 space-y-3 sm:space-y-0">
                 <div className="relative flex-1">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="material-icons text-gray-400">search</span>
+                    <Search className="h-5 w-5 text-gray-400" />
                   </div>
                   <Input
                     value={palletId}
@@ -144,7 +144,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                     onClick={() => setIsScannerOpen(true)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary bg-primary-50 p-2 rounded-full hover:bg-primary-100"
                   >
-                    <span className="material-icons">qr_code_scanner</span>
+                    <QrCode className="h-5 w-5" />
                   </button>
                 </div>
                 <Button 
@@ -152,7 +152,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                   className="bg-primary hover:bg-primary-dark text-white py-6 px-8"
                   size="lg"
                 >
-                  <span className="material-icons mr-2">search</span>
+                  <Search className="h-5 w-5 mr-2" />
                   Find Pallet
                 </Button>
               </div>
@@ -169,7 +169,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
                     <div className="flex">
-                      <span className="material-icons text-red-500 mr-2">error</span>
+                      <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
                       <p className="text-red-700">{(error as Error).message}</p>
                     </div>
                   </div>
@@ -201,7 +201,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                           return (
                             <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
                               <div className="flex items-start">
-                                <span className="material-icons text-red-600 mr-2 mt-0.5 text-2xl animate-pulse">warning</span>
+                                <AlertTriangle className="h-6 w-6 text-red-600 mr-2 mt-0.5 animate-pulse" />
                                 <div>
                                   <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
                                   <AlertDescription className="text-red-700 font-semibold">
@@ -235,7 +235,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                       <div className="bg-gradient-to-r from-primary-50 to-gray-50 p-4 border-b border-gray-200">
                         <div className="flex flex-wrap justify-between items-center">
                           <div className="flex items-center space-x-2 mb-2 sm:mb-0">
-                            <span className="material-icons text-primary text-2xl">inventory_2</span>
+                            <Package2 className="h-6 w-6 text-primary" />
                             <h3 className="font-bold text-xl text-primary">{pallet.palletId}</h3>
                             {pallet.status && (
                               <Badge className={
@@ -269,7 +269,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                             className="text-primary border-primary hover:bg-primary-50"
                             onClick={() => printPalletLabel(pallet.palletId, pallet.rmNumber, pallet.location)}
                           >
-                            <span className="material-icons text-sm mr-1">print</span>
+                            <Printer className="h-4 w-4 mr-1" />
                             Print Label
                           </Button>
                         </div>
@@ -342,7 +342,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                                   
                                   <div className="flex justify-between items-center mt-1 text-sm">
                                     <div className="flex items-center">
-                                      <span className="material-icons text-gray-500 text-sm mr-1">event</span>
+                                      <Calendar className="h-4 w-4 text-gray-500 mr-1" />
                                       <div className={
                                         isExpiredFlag 
                                           ? "text-red-600" 
@@ -371,7 +371,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                                         onClick={() => handlePickLot(lot)}
                                         className="ml-2"
                                       >
-                                        <span className="material-icons text-xs mr-1">add_shopping_cart</span>
+                                        <ShoppingCart className="h-3 w-3 mr-1" />
                                         Pick
                                       </Button>
                                     )}

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Header from "./Header";
 import Footer from "./Footer";
 import { useLocation } from "wouter";
+import { LayoutGrid, History, Settings } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
