@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { PalletWithLots } from "@shared/schema";
+import { PalletWithLots, PalletStatus } from "@shared/schema";
 import { z } from "zod";
 
 import { 
@@ -27,9 +27,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// Define status types locally to avoid import issues
-// These must match the schema values
-type PalletStatus = "active" | "archived" | "damaged";
+// Using PalletStatus imported from schema
 
 export default function PalletList() {
   const { connected } = useWebSocket();
@@ -187,7 +185,7 @@ export default function PalletList() {
               className="bg-primary hover:bg-primary-dark text-white flex items-center w-full sm:w-auto"
               onClick={() => setIsNewPalletModalOpen(true)}
             >
-              <span className="material-icons mr-1">add</span>
+              <Plus className="h-5 w-5 mr-1" />
               New Pallet
             </Button>
           </div>
@@ -199,7 +197,7 @@ export default function PalletList() {
         {!connected && (
           <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
             <div className="flex items-center">
-              <span className="material-icons mr-2">wifi_off</span>
+              <WifiOff className="h-5 w-5 mr-2" />
               <span className="font-medium">Disconnected from server</span>
             </div>
             <p className="mt-1 text-sm">
@@ -221,7 +219,7 @@ export default function PalletList() {
         
         {!isLoading && filteredPallets.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg px-4 py-12 text-center">
-            <span className="material-icons text-gray-400 text-5xl mb-3">inventory</span>
+            <Package className="h-16 w-16 text-gray-400 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-800 mb-1">No pallets found</h3>
             <p className="text-gray-500 mb-4">
               {searchTerm 
@@ -235,7 +233,7 @@ export default function PalletList() {
                 onClick={() => setIsNewPalletModalOpen(true)}
                 className="inline-flex items-center"
               >
-                <span className="material-icons mr-1">add</span>
+                <Plus className="h-5 w-5 mr-1" />
                 Create First Pallet
               </Button>
             )}
