@@ -158,34 +158,58 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
 
                 {pallet && (
                   <>
-                    {/* FIFO Check Alert */}
-                    {pallet.fifoCheck?.hasOlderLots && (
-                      <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
-                        <div className="flex items-start">
-                          <span className="material-icons text-red-600 mr-2 mt-0.5 text-2xl animate-pulse">warning</span>
-                          <div>
-                            <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
-                            <AlertDescription className="text-red-700 font-semibold">
-                              <p className="mb-2 text-base">Older lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> exist in other locations. Consider using those first:</p>
-                              <ul className="list-disc ml-5 space-y-1">
-                                {pallet.fifoCheck.olderLots.slice(0, 3).map((item, index) => (
-                                  <li key={index} className="font-bold">
-                                    <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
-                                  </li>
-                                ))}
-                                {pallet.fifoCheck.olderLots.length > 3 && (
-                                  <li className="text-red-600">
-                                    <span className="font-extrabold">
-                                      +{pallet.fifoCheck.olderLots.length - 3} more location(s)
-                                    </span>
-                                  </li>
-                                )}
-                              </ul>
-                            </AlertDescription>
-                          </div>
-                        </div>
-                      </Alert>
-                    )}
+                    {/* FIFO Check Alert - Only show if this pallet's lots expire after other lots */}
+                    {(() => {
+                      // Check if there are FIFO lots to evaluate
+                      if (pallet.fifoCheck?.hasOlderLots && pallet.lots.length > 0) {
+                        // Find the earliest expiring lot in this pallet
+                        const currentLot = pallet.lots.reduce((earliest, lot) => {
+                          const currentDate = new Date(earliest.expirationDate);
+                          const lotDate = new Date(lot.expirationDate);
+                          return lotDate < currentDate ? lot : earliest;
+                        }, pallet.lots[0]);
+                        
+                        const currentLotDate = new Date(currentLot.expirationDate);
+                        
+                        // Filter only lots that expire before the current lot (FEFO)
+                        const earlierExpiringLots = pallet.fifoCheck.olderLots.filter((item: any) => {
+                          const itemExpDate = new Date(item.lot.expirationDate);
+                          return itemExpDate < currentLotDate; // Only show lots that expire sooner
+                        });
+                        
+                        // Only show warning if there are lots with earlier expiration dates
+                        if (earlierExpiringLots.length > 0) {
+                          return (
+                            <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
+                              <div className="flex items-start">
+                                <span className="material-icons text-red-600 mr-2 mt-0.5 text-2xl animate-pulse">warning</span>
+                                <div>
+                                  <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
+                                  <AlertDescription className="text-red-700 font-semibold">
+                                    <p className="mb-2 text-base">Lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> with earlier expiration dates exist. Follow FEFO (First Expired, First Out):</p>
+                                    <ul className="list-disc ml-5 space-y-1">
+                                      {earlierExpiringLots.slice(0, 3).map((item: any, index: number) => (
+                                        <li key={index} className="font-bold">
+                                          <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit} (Expires: {formatDate(item.lot.expirationDate)})
+                                        </li>
+                                      ))}
+                                      {earlierExpiringLots.length > 3 && (
+                                        <li className="text-red-600">
+                                          <span className="font-extrabold">
+                                            +{earlierExpiringLots.length - 3} more location(s)
+                                          </span>
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </AlertDescription>
+                                </div>
+                              </div>
+                            </Alert>
+                          );
+                        }
+                      }
+                      return null; // If no earlier-expiring lots, don't show the warning
+                    })()}
                     
                     <div className="border border-gray-200 rounded-md overflow-hidden shadow-sm mb-4">
                       {/* Enhanced Pallet Header */}
