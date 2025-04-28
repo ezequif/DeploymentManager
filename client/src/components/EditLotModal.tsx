@@ -11,73 +11,30 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ScannerModal from "./ScannerModal";
 
-interface AddLotModalProps {
+interface EditLotModalProps {
   pallet: PalletWithLots;
+  lot: Lot;
   isOpen: boolean;
   onClose: () => void;
-  existingLot?: Lot; // Pass an existing lot for edit mode
 }
 
-export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: AddLotModalProps) {
-  // When existingLot is provided, pre-fill form with lot values
-  const [lotNumber, setLotNumber] = useState(existingLot?.lotNumber || "");
-  const [quantity, setQuantity] = useState<number | null>(existingLot?.quantity || null);
-  const [unit, setUnit] = useState<"KGS" | "LBS">(
-    (existingLot?.unit as "KGS" | "LBS") || "KGS"
-  );
-  const [expirationDate, setExpirationDate] = useState<string>(
-    existingLot?.expirationDate || new Date().toISOString().split("T")[0]
-  );
+export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotModalProps) {
+  const [lotNumber, setLotNumber] = useState(lot.lotNumber);
+  const [quantity, setQuantity] = useState<number>(lot.quantity);
+  const [unit, setUnit] = useState<"KGS" | "LBS">(lot.unit as "KGS" | "LBS");
+  const [expirationDate, setExpirationDate] = useState<string>(lot.expirationDate);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   
   const { toast } = useToast();
 
-  // Add lot mutation
-  const addLotMutation = useMutation({
+  // Update lot mutation
+  const updateLotMutation = useMutation({
     mutationFn: async () => {
       if (!lotNumber || !quantity) {
         throw new Error("Please fill in all required fields");
       }
 
-      return apiRequest("POST", "/api/lots", {
-        palletId: pallet.id,
-        lotNumber,
-        quantity,
-        unit,
-        expirationDate,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pallets"] });
-      toast({
-        title: "Lot Added",
-        description: `Lot ${lotNumber} has been added to pallet ${pallet.palletId}.`,
-      });
-      onClose();
-      
-      // Reset form
-      setLotNumber("");
-      setQuantity(null);
-      setUnit("KGS");
-      setExpirationDate(new Date().toISOString().split("T")[0]);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error Adding Lot",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Update lot mutation
-  const updateLotMutation = useMutation({
-    mutationFn: async () => {
-      if (!existingLot || !lotNumber || !quantity) {
-        throw new Error("Please fill in all required fields");
-      }
-
-      return apiRequest("PATCH", `/api/lots/${existingLot.id}`, {
+      return apiRequest("PATCH", `/api/lots/${lot.id}`, {
         lotNumber,
         quantity,
         unit,
@@ -112,9 +69,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {existingLot ? "Edit Lot" : "Add New Lot"}
-            </DialogTitle>
+            <DialogTitle className="text-lg font-bold">Edit Lot</DialogTitle>
           </DialogHeader>
           
           <div className="py-4">
@@ -163,7 +118,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                       type="number"
                       step="0.1"
                       placeholder="0.0"
-                      value={quantity || ''}
+                      value={quantity}
                       onChange={(e) => setQuantity(parseFloat(e.target.value))}
                     />
                   </div>
@@ -209,14 +164,11 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                 Cancel
               </Button>
               <Button 
-                onClick={() => existingLot ? updateLotMutation.mutate() : addLotMutation.mutate()}
-                disabled={(existingLot ? updateLotMutation.isPending : addLotMutation.isPending) || !lotNumber || !quantity}
-                className="w-full sm:w-auto bg-secondary hover:bg-secondary/90"
+                onClick={() => updateLotMutation.mutate()}
+                disabled={updateLotMutation.isPending || !lotNumber || !quantity}
+                className="w-full sm:w-auto"
               >
-                {existingLot 
-                  ? (updateLotMutation.isPending ? "Updating..." : "Update Lot") 
-                  : (addLotMutation.isPending ? "Adding..." : "Add Lot")
-                }
+                {updateLotMutation.isPending ? "Updating..." : "Update Lot"}
               </Button>
             </div>
           </div>

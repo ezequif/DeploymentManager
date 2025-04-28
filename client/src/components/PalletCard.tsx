@@ -23,6 +23,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
   });
   
   const [isAddLotModalOpen, setIsAddLotModalOpen] = useState(false);
+  const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const { toast } = useToast();
   
   // Sort lots by expiration date (ascending)
@@ -247,7 +248,13 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                           >
                             Pick
                           </button>
-                          <button className="bg-white border border-gray-300 text-gray-700 py-1 px-3 rounded text-sm font-medium">
+                          <button 
+                            className="bg-white border border-gray-300 text-gray-700 py-1 px-3 rounded text-sm font-medium"
+                            onClick={() => {
+                              setEditingLot(lot);
+                              setIsAddLotModalOpen(true);
+                            }}
+                          >
                             Edit
                           </button>
                         </td>
@@ -261,7 +268,10 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           <div className="mt-3 flex justify-end">
             <button 
               className="text-primary font-medium flex items-center text-sm hover:bg-gray-50 px-3 py-1 rounded"
-              onClick={() => setIsAddLotModalOpen(true)}
+              onClick={() => {
+                setEditingLot(null); // Clear any previous editing lot
+                setIsAddLotModalOpen(true);
+              }}
             >
               <span className="material-icons text-sm mr-1">add</span>
               Add Lot
