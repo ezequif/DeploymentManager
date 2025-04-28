@@ -33,8 +33,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   wss.on('connection', (ws) => {
     console.log('Client connected');
     
-    // Send current pallets to new client
-    storage.getPallets().then(pallets => {
+    // Send current active pallets to new client
+    storage.getPallets("active").then(pallets => {
       ws.send(JSON.stringify({
         type: 'init',
         data: { 
@@ -61,10 +61,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Routes
-  // Get all pallets with their lots
+  // Get all pallets with their lots (optional status filter)
   app.get('/api/pallets', async (req, res) => {
     try {
-      const pallets = await storage.getPallets();
+      const status = req.query.status as string | undefined;
+      const pallets = await storage.getPallets(status);
       res.json(pallets);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch pallets' });
@@ -173,6 +174,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Validation error', errors: error.errors });
       }
       res.status(500).json({ message: 'Failed to update pallet' });
+    }
+  });
+  
+  // Archive a pallet
+  app.post('/api/pallets/:id/archive', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const notes = req.body.notes as string | undefined;
+      
+      try {
+        const archivedPallet = await storage.archivePallet(id, notes);
+        
+        if (!archivedPallet) {
+          return res.status(404).json({ message: 'Pallet not found' });
+        }
+        
+        const palletWithLots = await storage.getPallet(id);
+        
+        // Broadcast pallet update
+        broadcast({
+          type: 'palletUpdated',
+          data: palletWithLots
+        });
+        
+        res.json({ message: 'Pallet archived successfully', pallet: palletWithLots });
+      } catch (error) {
+        if (error instanceof Error) {
+          return res.status(400).json({ message: error.message });
+        }
+        throw error;
+      }
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to archive pallet' });
     }
   });
 

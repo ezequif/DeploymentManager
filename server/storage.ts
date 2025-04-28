@@ -9,11 +9,12 @@ import { eq, desc, asc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Pallet CRUD
-  getPallets(): Promise<PalletWithLots[]>;
+  getPallets(statusFilter?: string): Promise<PalletWithLots[]>;
   getPallet(id: number): Promise<PalletWithLots | undefined>;
   getPalletByPalletId(palletId: string): Promise<PalletWithLots | undefined>;
   createPallet(pallet: InsertPallet): Promise<Pallet>;
   updatePallet(id: number, pallet: Partial<InsertPallet>): Promise<Pallet | undefined>;
+  archivePallet(id: number, notes?: string): Promise<Pallet | undefined>;
   
   // Lot CRUD
   getLots(palletId: number): Promise<Lot[]>;
@@ -28,16 +29,71 @@ export interface IStorage {
   
   // Utility
   generatePalletId(): Promise<string>;
+  isPalletEmpty(palletId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getPallets(): Promise<PalletWithLots[]> {
-    const palletsData = await db.select().from(pallets).orderBy(desc(pallets.createdAt));
+  async getPallets(statusFilter?: string): Promise<PalletWithLots[]> {
+    let query = db.select().from(pallets);
+    
+    // Apply status filter if provided
+    if (statusFilter) {
+      query = query.where(eq(pallets.status, statusFilter));
+    }
+    
+    const palletsData = await query.orderBy(desc(pallets.createdAt));
     
     return Promise.all(palletsData.map(async pallet => {
       const lotsData = await this.getLots(pallet.id);
       return { ...pallet, lots: lotsData };
     }));
+  }
+  
+  async archivePallet(id: number, notes?: string): Promise<Pallet | undefined> {
+    // First check if the pallet is empty
+    const isEmpty = await this.isPalletEmpty(id);
+    if (!isEmpty) {
+      throw new Error("Cannot archive a pallet that still has inventory");
+    }
+    
+    // Update the pallet status to archived
+    const [archivedPallet] = await db
+      .update(pallets)
+      .set({ status: "archived" })
+      .where(eq(pallets.id, id))
+      .returning();
+      
+    if (!archivedPallet) {
+      return undefined;
+    }
+    
+    // Get a sample lot to reference in the transaction
+    // We'll use the first lot associated with this pallet historically
+    const [firstLot] = await db
+      .select()
+      .from(lots)
+      .where(eq(lots.palletId, id))
+      .limit(1);
+      
+    // Record a transaction for archiving
+    if (firstLot) {
+      await this.createTransaction({
+        lotId: firstLot.id,
+        transactionType: "archive",
+        quantity: 0,
+        notes: notes || `Pallet ${archivedPallet.palletId} archived - empty`
+      });
+    }
+    
+    return archivedPallet;
+  }
+  
+  async isPalletEmpty(palletId: number): Promise<boolean> {
+    const palletLots = await this.getLots(palletId);
+    
+    // Check if all lots have zero quantity
+    const totalQuantity = palletLots.reduce((sum, lot) => sum + lot.quantity, 0);
+    return totalQuantity <= 0 || palletLots.length === 0;
   }
 
   async getPallet(id: number): Promise<PalletWithLots | undefined> {
