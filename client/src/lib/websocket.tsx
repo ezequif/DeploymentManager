@@ -93,8 +93,9 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             break;
             
           case 'connectedClients':
-            // This message will be handled by the modal directly
-            // through the fetch call and doesn't need state management here
+            // We could manage this in state if needed in the future,
+            // but for now we'll handle it in the ConnectedClientsModal
+            console.log('Received connected clients:', message.data);
             break;
             
           case 'userCount':
