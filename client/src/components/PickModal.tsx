@@ -27,7 +27,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   
-  // Fetch FIFO check data when component mounts
+  // Fetch FIFO check data when component mounts and filter based on expiration date
   useEffect(() => {
     const fetchFifoCheck = async () => {
       try {
@@ -36,7 +36,24 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
         const response = await apiRequest("GET", `/api/pallets/older-lots/${pallet.rmNumber}?excludePalletId=${pallet.palletId}`);
         const data = await response.json();
         console.log("FIFO check data:", data);
-        setFifoCheck(data);
+        
+        // Filter lots that expire before the current lot (FEFO - First Expired, First Out)
+        if (data.olderLots && data.olderLots.length > 0) {
+          const currentLotDate = new Date(lot.expirationDate);
+          
+          // Filter only lots that expire before the current lot
+          const earlierExpiringLots = data.olderLots.filter((item: {pallet: Pallet, lot: Lot}) => {
+            const itemExpDate = new Date(item.lot.expirationDate);
+            return itemExpDate < currentLotDate; // Only include lots that expire sooner
+          });
+          
+          setFifoCheck({
+            hasOlderLots: earlierExpiringLots.length > 0,
+            olderLots: earlierExpiringLots
+          });
+        } else {
+          setFifoCheck(data);
+        }
       } catch (error) {
         console.error("Error checking for older lots:", error);
       } finally {
@@ -45,7 +62,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
     };
     
     fetchFifoCheck();
-  }, [pallet.rmNumber, pallet.palletId]);
+  }, [pallet.rmNumber, pallet.palletId, lot.expirationDate]);
   
   const pickMutation = useMutation({
     mutationFn: async () => {
@@ -110,7 +127,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                   <div>
                     <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
                     <AlertDescription className="text-red-700 font-semibold">
-                      <p className="mb-2 text-base">Older lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> exist in other locations. Consider using those first:</p>
+                      <p className="mb-2 text-base">Lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> with earlier expiration dates exist. Follow FEFO (First Expired, First Out):</p>
                       <ul className="list-disc ml-5 space-y-1">
                         {fifoCheck.olderLots.slice(0, 3).map((item, index) => (
                           <li key={index} className="font-bold">
