@@ -53,10 +53,16 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         variant: 'destructive',
       });
       
-      // Try to reconnect after 3 seconds
+      // Try to reconnect after 1 second
       setTimeout(() => {
-        window.location.reload();
-      }, 3000);
+        // Create new WebSocket connection
+        const newWs = new WebSocket(wsUrl);
+        newWs.onopen = ws.onopen;
+        newWs.onclose = ws.onclose;
+        newWs.onerror = ws.onerror;
+        newWs.onmessage = ws.onmessage;
+        setSocket(newWs);
+      }, 1000);
     };
 
     ws.onerror = (error) => {

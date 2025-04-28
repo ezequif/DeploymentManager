@@ -1,16 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWebSocket } from "../lib/websocket";
 import PalletCard from "../components/PalletCard";
 import NewPalletModal from "../components/NewPalletModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { PalletWithLots } from "@shared/schema";
 
 export default function PalletList() {
-  const { pallets, connected } = useWebSocket();
+  const { connected } = useWebSocket();
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewPalletModalOpen, setIsNewPalletModalOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Use React Query to fetch pallets
+  const { data: apiPallets = [], isLoading } = useQuery<PalletWithLots[]>({
+    queryKey: ['/api/pallets'],
+  });
+  
+  // Also use WebSocket pallets as a backup/realtime source
+  const { pallets: wsPallets } = useWebSocket();
+  
+  // Combine both sources, preferring API pallets but using WebSocket if available
+  const [pallets, setPallets] = useState<PalletWithLots[]>([]);
+  
+  useEffect(() => {
+    if (apiPallets.length > 0) {
+      console.log("Using API pallets:", apiPallets);
+      setPallets(apiPallets);
+    } else if (wsPallets.length > 0) {
+      console.log("Using WebSocket pallets:", wsPallets);
+      setPallets(wsPallets);
+    } else {
+      console.log("No pallets available");
+      setPallets([]);
+    }
+  }, [apiPallets, wsPallets]);
   
   // Filter pallets based on search term
   const filteredPallets = pallets.filter(pallet => {
@@ -75,8 +101,19 @@ export default function PalletList() {
             </p>
           </div>
         )}
+
+        {isLoading && (
+          <div className="bg-white border border-gray-200 rounded-lg px-4 py-12 text-center">
+            <div className="animate-pulse">
+              <div className="h-12 bg-gray-200 rounded mb-4"></div>
+              <div className="h-8 bg-gray-200 rounded w-1/2 mx-auto mb-4"></div>
+              <div className="h-8 bg-gray-200 rounded w-1/4 mx-auto"></div>
+            </div>
+            <p className="mt-4 text-gray-500">Loading pallets...</p>
+          </div>
+        )}
         
-        {filteredPallets.length === 0 ? (
+        {!isLoading && filteredPallets.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg px-4 py-12 text-center">
             <span className="material-icons text-gray-400 text-5xl mb-3">inventory</span>
             <h3 className="text-lg font-medium text-gray-800 mb-1">No pallets found</h3>
@@ -96,7 +133,7 @@ export default function PalletList() {
             )}
           </div>
         ) : (
-          filteredPallets.map(pallet => (
+          !isLoading && filteredPallets.map(pallet => (
             <PalletCard key={pallet.id} pallet={pallet} />
           ))
         )}

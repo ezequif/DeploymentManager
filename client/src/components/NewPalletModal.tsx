@@ -36,7 +36,8 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   const { toast } = useToast();
   
   // Fetch new pallet ID
-  const { data: palletIdData, isLoading: isLoadingPalletId } = useQuery({
+  type PalletIdResponse = { palletId: string };
+  const { data: palletIdData, isLoading: isLoadingPalletId } = useQuery<PalletIdResponse>({
     queryKey: ['/api/pallets/generate-id'],
     enabled: isOpen,
   });
@@ -57,7 +58,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   });
   
   // Update form with generated pallet ID when available
-  if (palletIdData && !form.getValues().palletId) {
+  if (palletIdData?.palletId && !form.getValues().palletId) {
     form.setValue('palletId', palletIdData.palletId);
   }
   
