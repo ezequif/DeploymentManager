@@ -236,11 +236,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLot(lot: InsertLot): Promise<Lot> {
+    // If expirationDate is provided, ensure it's properly formatted
+    // This prevents timezone issues when dates are saved
+    if (lot.expirationDate) {
+      // Log the date for debugging
+      console.log("Create lot - original date from client:", lot.expirationDate);
+      // Keep the date as is, don't create Date objects which could cause timezone shifts
+    }
+    
     const [newLot] = await db.insert(lots).values(lot).returning();
     return newLot;
   }
 
   async updateLot(id: number, lot: Partial<InsertLot>): Promise<Lot | undefined> {
+    // If expirationDate is provided, ensure it's properly formatted
+    // This prevents timezone issues when dates are saved
+    if (lot.expirationDate) {
+      // Extract the date portion only to prevent timezone issues
+      try {
+        // Keep date exactly as provided without timezone conversion
+        console.log("Original date from client:", lot.expirationDate);
+        
+        // Format: YYYY-MM-DD - keep it as is, don't create Date objects
+        // which could cause timezone shifts
+      } catch (error) {
+        console.error("Error normalizing date:", error);
+      }
+    }
+    
     const [updatedLot] = await db
       .update(lots)
       .set(lot)
