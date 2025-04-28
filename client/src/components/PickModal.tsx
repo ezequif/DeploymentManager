@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PalletWithLots, Lot } from "@shared/schema";
-import { formatDate } from "../lib/formatUtils";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { PalletWithLots, Lot, Pallet } from "@shared/schema";
+import { formatDate, formatQuantity } from "../lib/formatUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -22,7 +23,28 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
   const [quantity, setQuantity] = useState<number | ''>(lot.quantity);
   const [destination, setDestination] = useState("");
   const [notes, setNotes] = useState("");
+  const [fifoCheck, setFifoCheck] = useState<{ hasOlderLots: boolean, olderLots: Array<{pallet: Pallet, lot: Lot}> } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
+  // Fetch FIFO check data when component mounts
+  useEffect(() => {
+    const fetchFifoCheck = async () => {
+      try {
+        setIsLoading(true);
+        // Check if there are older lots with the same RM number for FIFO checking
+        const response = await apiRequest("GET", `/api/fifo-check/${pallet.rmNumber}?excludePalletId=${pallet.palletId}`);
+        const data = await response.json();
+        setFifoCheck(data);
+      } catch (error) {
+        console.error("Error checking for older lots:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchFifoCheck();
+  }, [pallet.rmNumber, pallet.palletId]);
   
   const pickMutation = useMutation({
     mutationFn: async () => {
