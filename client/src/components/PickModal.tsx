@@ -66,7 +66,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Pick From Lot</DialogTitle>
         </DialogHeader>
@@ -130,18 +130,22 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
             </div>
           </div>
           
-          <DialogFooter className="flex justify-end space-x-3">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
             <Button 
               onClick={() => pickMutation.mutate()}
               disabled={pickMutation.isPending || quantity <= 0 || quantity > lot.quantity}
-              className="bg-secondary hover:bg-secondary/90"
+              className="w-full sm:w-auto bg-secondary hover:bg-secondary/90"
             >
               {pickMutation.isPending ? "Processing..." : "Confirm Pick"}
             </Button>
-          </DialogFooter>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

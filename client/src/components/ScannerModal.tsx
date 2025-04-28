@@ -143,7 +143,7 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Barcode Scanner</DialogTitle>
         </DialogHeader>
@@ -163,17 +163,17 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
                   autoFocus
                 />
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   type="button" 
                   variant="outline"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => setManualEntry(false)}
                 >
                   <span className="material-icons mr-1">camera_alt</span>
                   Use Camera
                 </Button>
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="w-full">
                   <span className="material-icons mr-1">check</span>
                   Submit
                 </Button>
@@ -207,10 +207,10 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
                 {scanResult ? scanResult : "Ready to scan"}
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button 
                 variant="outline" 
-                className="flex-1"
+                className="w-full"
                 onClick={switchCamera}
                 disabled={cameras.length <= 1}
               >
@@ -218,7 +218,7 @@ export default function ScannerModal({ onClose }: ScannerModalProps) {
                 Switch Camera
               </Button>
               <Button 
-                className="flex-1"
+                className="w-full"
                 onClick={() => setManualEntry(true)}
               >
                 <span className="material-icons mr-1">keyboard</span>

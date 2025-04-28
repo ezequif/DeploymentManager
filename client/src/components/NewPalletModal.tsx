@@ -93,7 +93,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Create New Pallet</DialogTitle>
         </DialogHeader>
@@ -251,21 +251,23 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
             )}
           </div>
           
-          <DialogFooter className="mt-6 flex justify-end space-x-3">
+          <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onClose}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button 
               type="submit"
               disabled={createPallet.isPending}
+              className="w-full sm:w-auto"
             >
               {createPallet.isPending ? "Creating..." : "Create Pallet"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
