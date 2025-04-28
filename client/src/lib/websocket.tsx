@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { PalletWithLots } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 
@@ -84,7 +84,16 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             break;
             
           case 'palletCreated':
-            setPallets(prev => [...prev, message.data]);
+            console.log('Pallet created', message.data);
+            setPallets(prev => {
+              // Check if the pallet already exists in the array
+              const exists = prev.some(p => p.id === message.data.id);
+              if (exists) {
+                return prev.map(p => p.id === message.data.id ? message.data : p);
+              } else {
+                return [...prev, message.data];
+              }
+            });
             toast({
               title: 'Pallet Created',
               description: `Pallet ${message.data.palletId} has been created.`,
