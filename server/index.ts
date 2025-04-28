@@ -2,8 +2,22 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
+import cors from "cors";
 
 const app = express();
+
+// Add CORS protection
+app.use(cors({
+  // In production, restrict this to your actual domain
+  origin: process.env.NODE_ENV === 'production' 
+    ? (process.env.ALLOWED_ORIGIN || true) // Allow specific origin in production if set, otherwise dynamic
+    : true, // Allow any origin in development
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // Allow cookies if we add auth later
+  maxAge: 86400 // Cache preflight requests for 1 day
+}));
+
 // Add Helmet for enhanced security headers
 app.use(helmet({
   contentSecurityPolicy: {

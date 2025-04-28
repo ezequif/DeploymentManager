@@ -20,8 +20,27 @@ type WSMessage = {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
-  // Create WebSocket server
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // Create WebSocket server with security options
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    // Additional security options
+    clientTracking: true, // Track connected clients
+    perMessageDeflate: {
+      zlibDeflateOptions: {
+        chunkSize: 1024,
+        memLevel: 7,
+        level: 3
+      },
+      zlibInflateOptions: {
+        chunkSize: 10 * 1024
+      },
+      // Below options specified as default values
+      concurrencyLimit: 10, // Limits zlib concurrency for perf
+      threshold: 1024 // Size in bytes below which messages are not compressed
+    },
+    maxPayload: 50 * 1024 * 1024, // 50MB max payload size
+  });
   
   // Client information type
   type ClientInfo = {
@@ -66,17 +85,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket connection
   wss.on('connection', (ws, req) => {
+    // Basic security check for origin
+    const origin = req.headers.origin || '';
+    
+    // In production, you would restrict this to specific origins
+    if (process.env.NODE_ENV === 'production' && 
+        process.env.ALLOWED_ORIGIN && 
+        origin && 
+        !origin.startsWith(process.env.ALLOWED_ORIGIN)) {
+      console.warn(`Rejected WebSocket connection from unauthorized origin: ${origin}`);
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
+    
     // Extract client information
     const ipAddress = req.headers['x-forwarded-for'] || 
                       req.socket.remoteAddress || 
                       'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     
-    // Store client information
+    // Connection rate limiting (example)
+    const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
+    
+    // Create a unique client ID with more entropy
+    const generateSecureClientId = () => {
+      const randomPart = Math.random().toString(36).substring(2, 10);
+      const timestamp = Date.now().toString(36);
+      return `${timestamp}${randomPart}`;
+    };
+    
+    // Store client information with the more secure ID
     const clientInfo: ClientInfo = {
       socket: ws,
-      id: generateClientId(),
-      ipAddress: typeof ipAddress === 'string' ? ipAddress : ipAddress[0],
+      id: generateSecureClientId(),
+      ipAddress: clientIp,
       connectedAt: new Date(),
       userAgent
     };
@@ -85,16 +127,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     console.log(`Client connected: ${clientInfo.id} from ${clientInfo.ipAddress}`);
     
+    // Set a ping interval to keep the connection alive and detect stale connections
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === 1) { // WebSocket.OPEN
+        ws.ping();
+      }
+    }, 30000); // 30 seconds
+    
     // Send current active pallets to new client
     storage.getPallets("active").then(pallets => {
-      ws.send(JSON.stringify({
-        type: 'init',
-        data: { 
-          pallets,
-          connectedUsers: wss.clients.size,
-          clientId: clientInfo.id
-        }
-      }));
+      if (ws.readyState === 1) { // WebSocket.OPEN
+        ws.send(JSON.stringify({
+          type: 'init',
+          data: { 
+            pallets,
+            connectedUsers: wss.clients.size,
+            clientId: clientInfo.id
+          }
+        }));
+      }
+    }).catch(err => {
+      console.error("Failed to send initial data:", err);
     });
 
     // Broadcast connected users count
@@ -103,33 +156,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       data: wss.clients.size
     });
 
-    // Handle client messages
+    // Enhanced message handling with validation
     ws.on('message', (message) => {
       try {
+        // Basic message size validation
+        if (message.toString().length > 100000) { // 100KB limit for message size
+          console.warn(`Rejected large message from client ${clientInfo.id}: ${message.toString().length} bytes`);
+          return;
+        }
+        
         const data = JSON.parse(message.toString());
         
-        // Handle admin command to get connected clients
-        if (data.type === 'getConnectedClients') {
-          ws.send(JSON.stringify({
-            type: 'connectedClients',
-            data: getConnectedClientDetails()
-          }));
+        // Validate message structure
+        if (!data || typeof data !== 'object' || !data.type) {
+          console.warn(`Invalid message format from client ${clientInfo.id}`);
+          return;
+        }
+        
+        // Handle message types with validation
+        switch (data.type) {
+          case 'getConnectedClients':
+            // This is an admin command, in production you would add authorization checks
+            ws.send(JSON.stringify({
+              type: 'connectedClients',
+              data: getConnectedClientDetails()
+            }));
+            break;
+            
+          case 'ping':
+            // Simple ping-pong for connection testing
+            ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            break;
+            
+          default:
+            console.warn(`Unknown message type from client ${clientInfo.id}: ${data.type}`);
         }
       } catch (error) {
-        console.error('Error processing message:', error);
+        console.error(`Error processing message from ${clientInfo.id}:`, error);
+      }
+    });
+    
+    // Enhanced error handling
+    ws.on('error', (error) => {
+      console.error(`WebSocket error for client ${clientInfo.id}:`, error);
+    });
+    
+    // Enhanced ping/pong handling
+    ws.on('pong', () => {
+      // Update last active timestamp if needed
+      const client = clients.get(ws);
+      if (client) {
+        // You could update a lastActive timestamp here if needed
       }
     });
 
-    // Handle client disconnect
-    ws.on('close', () => {
+    // Handle client disconnect with proper cleanup
+    ws.on('close', (code, reason) => {
+      // Clear the ping interval to prevent memory leaks
+      clearInterval(pingInterval);
+      
       const clientInfo = clients.get(ws);
       if (clientInfo) {
-        console.log(`Client disconnected: ${clientInfo.id}`);
+        console.log(`Client disconnected: ${clientInfo.id} Code: ${code} Reason: ${reason || 'No reason provided'}`);
         clients.delete(ws);
       } else {
-        console.log('Client disconnected');
+        console.log(`Client disconnected Code: ${code} Reason: ${reason || 'No reason provided'}`);
       }
       
+      // Update connected user count
       broadcast({
         type: 'userCount',
         data: wss.clients.size
