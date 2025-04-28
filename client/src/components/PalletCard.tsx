@@ -1,4 +1,4 @@
-import { PalletWithLots, Lot } from "@shared/schema";
+import { PalletWithLots, Lot, PalletStatus } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { formatDate, formatDateTime, formatQuantity, isExpiringSoon, isExpired } from "../lib/formatUtils";
 import { printPalletLabel } from "../lib/barcodeUtils";
@@ -10,8 +10,25 @@ import PickModal from "./PickModal";
 import AddLotModal from "./AddLotModal";
 import { 
   PrinterIcon, EditIcon, MoreVerticalIcon, CheckIcon, XIcon,
-  PackageIcon, MapPinIcon, AlertTriangleIcon, AlertCircleIcon, PlusIcon
+  PackageIcon, MapPinIcon, AlertTriangleIcon, AlertCircleIcon, PlusIcon,
+  ArchiveIcon
 } from "lucide-react";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PalletCardProps {
   pallet: PalletWithLots;
@@ -28,6 +45,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
   
   const [isAddLotModalOpen, setIsAddLotModalOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const { toast } = useToast();
   
   // Sort lots by expiration date (ascending)
@@ -86,6 +104,34 @@ export default function PalletCard({ pallet }: PalletCardProps) {
     }
   });
   
+  // Archive pallet mutation
+  const archivePallet = useMutation({
+    mutationFn: async (notes?: string) => {
+      return apiRequest("POST", `/api/pallets/${pallet.id}/archive`, {
+        notes: notes || `Pallet ${pallet.palletId} archived - empty pallet`
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
+      toast({
+        title: "Pallet archived",
+        description: `Pallet ${pallet.palletId} has been archived.`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error archiving pallet",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Handle archive pallet
+  const handleArchivePallet = () => {
+    setIsArchiveDialogOpen(true);
+  };
+  
   // Handle print label
   const handlePrintLabel = () => {
     printPalletLabel(pallet.palletId, pallet.rmNumber, pallet.location);
@@ -129,7 +175,15 @@ export default function PalletCard({ pallet }: PalletCardProps) {
             <div className="flex items-center space-x-2">
               <PackageIcon className="h-5 w-5 text-primary" />
               <h3 className="font-bold text-lg text-primary">{pallet.palletId}</h3>
-              <span className="bg-primary-light text-white text-xs px-2 py-1 rounded-full">Active</span>
+              <span className={`text-white text-xs px-2 py-1 rounded-full ${
+                pallet.status === "archived" 
+                  ? "bg-amber-500" 
+                  : pallet.status === "damaged" 
+                    ? "bg-red-500"
+                    : "bg-primary-light"
+              }`}>
+                {pallet.status.charAt(0).toUpperCase() + pallet.status.slice(1)}
+              </span>
             </div>
             {isEditingPallet ? (
               <div className="mt-2 sm:mt-0 flex items-center space-x-4">
@@ -203,12 +257,32 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                 >
                   <EditIcon className="h-5 w-5" />
                 </button>
-                <button 
-                  className="p-2 text-gray-600 hover:text-warning rounded-full hover:bg-gray-100" 
-                  title="Actions"
-                >
-                  <MoreVerticalIcon className="h-5 w-5" />
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="p-2 text-gray-600 hover:text-warning rounded-full hover:bg-gray-100" 
+                      title="Actions"
+                    >
+                      <MoreVerticalIcon className="h-5 w-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem 
+                      className="cursor-pointer flex items-center"
+                      onClick={handlePrintLabel}
+                    >
+                      <PrinterIcon className="h-4 w-4 mr-2" />
+                      Print Label
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="cursor-pointer flex items-center text-amber-600"
+                      onClick={() => handleArchivePallet()}
+                    >
+                      <ArchiveIcon className="h-4 w-4 mr-2" />
+                      Archive Pallet
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>
@@ -427,6 +501,36 @@ export default function PalletCard({ pallet }: PalletCardProps) {
           existingLot={editingLot}
         />
       )}
+      
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Pallet</AlertDialogTitle>
+            <AlertDialogDescription>
+              {sortedLots.length === 0 ? (
+                <p>Are you sure you want to archive this empty pallet? This will move it to the archived status.</p>
+              ) : (
+                <p className="text-red-600">
+                  This pallet still has inventory. You cannot archive a pallet until all lots have been picked.
+                </p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {sortedLots.length === 0 && (
+              <AlertDialogAction 
+                onClick={() => archivePallet.mutate('')}
+                disabled={archivePallet.isPending}
+                className="bg-amber-500 hover:bg-amber-600"
+              >
+                {archivePallet.isPending ? 'Archiving...' : 'Archive Pallet'}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
