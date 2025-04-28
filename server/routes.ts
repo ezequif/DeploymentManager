@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket as WS } from "ws";
 import { storage } from "./storage";
 import { 
   insertPalletSchema, 
@@ -8,6 +8,9 @@ import {
   insertTransactionSchema 
 } from "@shared/schema";
 import { z } from "zod";
+
+// Using the WebSocket from 'ws' package, which is a bit different from browser's WebSocket
+type ServerWebSocket = WS;
 
 type WSMessage = {
   type: string;
@@ -20,6 +23,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
+  // Client information type
+  type ClientInfo = {
+    socket: ServerWebSocket;
+    id: string;
+    ipAddress: string;
+    connectedAt: Date;
+    userAgent: string;
+  };
+  
+  // Track clients with their information
+  const clients: Map<ServerWebSocket, ClientInfo> = new Map();
+  
+  // Generate a unique client ID
+  const generateClientId = () => {
+    return Math.random().toString(36).substring(2, 10);
+  };
+  
   // Broadcast to all clients
   const broadcast = (message: WSMessage) => {
     wss.clients.forEach((client) => {
@@ -28,10 +48,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   };
+  
+  // Get connected client details for admin purposes
+  const getConnectedClientDetails = () => {
+    const connectedClients = Array.from(clients.values())
+      .filter(info => info.socket.readyState === 1) // WebSocket.OPEN
+      .map(info => ({
+        id: info.id,
+        ipAddress: info.ipAddress,
+        connectedAt: info.connectedAt,
+        userAgent: info.userAgent,
+        connectedFor: Math.round((Date.now() - info.connectedAt.getTime()) / 1000) + ' seconds'
+      }));
+      
+    return connectedClients;
+  };
 
   // WebSocket connection
-  wss.on('connection', (ws) => {
-    console.log('Client connected');
+  wss.on('connection', (ws, req) => {
+    // Extract client information
+    const ipAddress = req.headers['x-forwarded-for'] || 
+                      req.socket.remoteAddress || 
+                      'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    // Store client information
+    const clientInfo: ClientInfo = {
+      socket: ws,
+      id: generateClientId(),
+      ipAddress: typeof ipAddress === 'string' ? ipAddress : ipAddress[0],
+      connectedAt: new Date(),
+      userAgent
+    };
+    
+    clients.set(ws, clientInfo);
+    
+    console.log(`Client connected: ${clientInfo.id} from ${clientInfo.ipAddress}`);
     
     // Send current active pallets to new client
     storage.getPallets("active").then(pallets => {
@@ -39,7 +91,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'init',
         data: { 
           pallets,
-          connectedUsers: wss.clients.size
+          connectedUsers: wss.clients.size,
+          clientId: clientInfo.id
         }
       }));
     });
@@ -50,9 +103,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       data: wss.clients.size
     });
 
+    // Handle client messages
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle admin command to get connected clients
+        if (data.type === 'getConnectedClients') {
+          ws.send(JSON.stringify({
+            type: 'connectedClients',
+            data: getConnectedClientDetails()
+          }));
+        }
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
+    });
+
     // Handle client disconnect
     ws.on('close', () => {
-      console.log('Client disconnected');
+      const clientInfo = clients.get(ws);
+      if (clientInfo) {
+        console.log(`Client disconnected: ${clientInfo.id}`);
+        clients.delete(ws);
+      } else {
+        console.log('Client disconnected');
+      }
+      
       broadcast({
         type: 'userCount',
         data: wss.clients.size
@@ -61,6 +138,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Routes
+  // Get connected clients info (admin endpoint)
+  app.get('/api/connected-clients', async (req, res) => {
+    try {
+      res.json(getConnectedClientDetails());
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch connected clients' });
+    }
+  });
+  
   // Get all pallets with their lots (optional status filter)
   app.get('/api/pallets', async (req, res) => {
     try {
