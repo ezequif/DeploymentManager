@@ -142,6 +142,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             });
             break;
             
+          case 'palletDeleted':
+            setPallets(prev => prev.filter(p => p.id !== message.data.id));
+            toast({
+              title: 'Pallet Deleted',
+              description: `Pallet ${message.data.palletId} has been permanently deleted.`,
+              variant: 'destructive'
+            });
+            break;
+            
+          case 'transactionDeleted':
+            // We don't store transactions in state, but toast a notification
+            toast({
+              title: 'Transaction Deleted',
+              description: `Transaction has been removed from history.`,
+            });
+            break;
+            
           case 'notification':
             toast({
               title: message.data.title,

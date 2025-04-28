@@ -14,6 +14,7 @@ export interface IStorage {
   getPalletByPalletId(palletId: string): Promise<PalletWithLots | undefined>;
   createPallet(pallet: InsertPallet): Promise<Pallet>;
   updatePallet(id: number, pallet: Partial<InsertPallet>): Promise<Pallet | undefined>;
+  deletePallet(id: number): Promise<boolean>;
   archivePallet(id: number, notes?: string): Promise<Pallet | undefined>;
   
   // Lot CRUD
@@ -26,6 +27,7 @@ export interface IStorage {
   // Transaction CRUD
   getTransactions(): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+  deleteTransaction(id: number): Promise<boolean>;
   
   // Utility
   generatePalletId(): Promise<string>;
@@ -132,6 +134,18 @@ export class DatabaseStorage implements IStorage {
     
     return updatedPallet;
   }
+  
+  async deletePallet(id: number): Promise<boolean> {
+    // First check if the pallet exists
+    const pallet = await this.getPallet(id);
+    if (!pallet) {
+      return false;
+    }
+    
+    // Since we have cascade delete set up in the schema, this will also delete all lots
+    const result = await db.delete(pallets).where(eq(pallets.id, id)).returning();
+    return result.length > 0;
+  }
 
   async getLots(palletId: number): Promise<Lot[]> {
     const lotsData = await db
@@ -187,6 +201,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return newTransaction;
+  }
+  
+  async deleteTransaction(id: number): Promise<boolean> {
+    const result = await db.delete(transactions).where(eq(transactions.id, id)).returning();
+    return result.length > 0;
   }
 
   async generatePalletId(): Promise<string> {

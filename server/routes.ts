@@ -209,6 +209,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to archive pallet' });
     }
   });
+  
+  // Delete a pallet
+  app.delete('/api/pallets/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // First get the pallet to store reference before deletion
+      const palletToDelete = await storage.getPallet(id);
+      if (!palletToDelete) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      const success = await storage.deletePallet(id);
+      
+      if (success) {
+        // Broadcast pallet deletion
+        broadcast({
+          type: 'palletDeleted',
+          data: { id, palletId: palletToDelete.palletId }
+        });
+        
+        res.json({ message: 'Pallet deleted successfully', palletId: palletToDelete.palletId });
+      } else {
+        res.status(404).json({ message: 'Pallet not found' });
+      }
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete pallet' });
+    }
+  });
 
   // Create a new lot for a pallet
   app.post('/api/lots', async (req, res) => {
@@ -406,6 +435,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Validation error', errors: error.errors });
       }
       res.status(500).json({ message: 'Failed to create transaction' });
+    }
+  });
+  
+  // Delete a transaction
+  app.delete('/api/transactions/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const deleted = await storage.deleteTransaction(id);
+      
+      if (deleted) {
+        // Broadcast transaction deletion
+        broadcast({
+          type: 'transactionDeleted',
+          data: { id }
+        });
+        
+        res.status(204).send();
+      } else {
+        res.status(404).json({ message: 'Transaction not found' });
+      }
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete transaction' });
     }
   });
 
