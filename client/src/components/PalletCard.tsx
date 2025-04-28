@@ -1,5 +1,5 @@
 import { PalletWithLots, Lot } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDate, formatDateTime, formatQuantity, isExpiringSoon, isExpired } from "../lib/formatUtils";
 import { printPalletLabel } from "../lib/barcodeUtils";
 import { apiRequest } from "../lib/queryClient";
@@ -8,6 +8,10 @@ import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import PickModal from "./PickModal";
 import AddLotModal from "./AddLotModal";
+import { 
+  PrinterIcon, EditIcon, MoreVerticalIcon, CheckIcon, XIcon,
+  PackageIcon, MapPinIcon, AlertTriangleIcon, AlertCircleIcon, PlusIcon
+} from "lucide-react";
 
 interface PalletCardProps {
   pallet: PalletWithLots;
@@ -95,6 +99,27 @@ export default function PalletCard({ pallet }: PalletCardProps) {
     });
   };
   
+  // Detect if we're likely on a TC70 or similar device
+  const [isTC70Device, setIsTC70Device] = useState(false);
+  
+  useEffect(() => {
+    // Check if this might be a TC70/TC75 device (based on user agent or screen size)
+    const userAgent = navigator.userAgent;
+    const isLikelyDatawedgeDevice = 
+      userAgent.includes("Android") && 
+      (userAgent.includes("TC") || 
+      userAgent.includes("MC") || 
+      userAgent.includes("ET"));
+    
+    // Also consider screen dimensions as a TC70 heuristic
+    const hasTC70Dimensions = 
+      window.screen.width <= 800 && 
+      window.screen.height <= 800 &&
+      window.screen.width >= 400;
+    
+    setIsTC70Device(isLikelyDatawedgeDevice || hasTC70Dimensions);
+  }, []);
+
   return (
     <>
       <div className="pallet-card bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -102,14 +127,14 @@ export default function PalletCard({ pallet }: PalletCardProps) {
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center">
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
             <div className="flex items-center space-x-2">
-              <span className="material-icons text-primary">inventory_2</span>
+              <PackageIcon className="h-5 w-5 text-primary" />
               <h3 className="font-bold text-lg text-primary">{pallet.palletId}</h3>
               <span className="bg-primary-light text-white text-xs px-2 py-1 rounded-full">Active</span>
             </div>
             {isEditingPallet ? (
               <div className="mt-2 sm:mt-0 flex items-center space-x-4">
                 <div className="flex items-center space-x-1">
-                  <span className="material-icons text-gray-500 text-sm">category</span>
+                  <PackageIcon className="h-4 w-4 text-gray-500" />
                   <input
                     type="text"
                     value={rmNumber}
@@ -118,7 +143,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                   />
                 </div>
                 <div className="flex items-center space-x-1">
-                  <span className="material-icons text-gray-500 text-sm">place</span>
+                  <MapPinIcon className="h-4 w-4 text-gray-500" />
                   <input
                     type="text"
                     value={location}
@@ -130,11 +155,11 @@ export default function PalletCard({ pallet }: PalletCardProps) {
             ) : (
               <div className="mt-2 sm:mt-0 flex items-center space-x-4">
                 <div className="flex items-center space-x-1">
-                  <span className="material-icons text-gray-500 text-sm">category</span>
+                  <PackageIcon className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-800">{pallet.rmNumber}</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <span className="material-icons text-gray-500 text-sm">place</span>
+                  <MapPinIcon className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-800">{pallet.location}</span>
                 </div>
               </div>
@@ -145,139 +170,242 @@ export default function PalletCard({ pallet }: PalletCardProps) {
             {isEditingPallet ? (
               <div className="flex space-x-1">
                 <button 
-                  className="p-1 text-gray-600 hover:text-success rounded-full hover:bg-gray-100"
+                  className="p-2 text-gray-600 hover:text-success rounded-full hover:bg-gray-100"
                   onClick={() => updatePallet.mutate()}
                   disabled={updatePallet.isPending}
                 >
-                  <span className="material-icons">check</span>
+                  <CheckIcon className="h-5 w-5" />
                 </button>
                 <button 
-                  className="p-1 text-gray-600 hover:text-destructive rounded-full hover:bg-gray-100"
+                  className="p-2 text-gray-600 hover:text-destructive rounded-full hover:bg-gray-100"
                   onClick={() => {
                     setRmNumber(pallet.rmNumber);
                     setLocation(pallet.location);
                     setIsEditingPallet(false);
                   }}
                 >
-                  <span className="material-icons">close</span>
+                  <XIcon className="h-5 w-5" />
                 </button>
               </div>
             ) : (
               <div className="flex space-x-1">
                 <button 
-                  className="p-1 text-gray-600 hover:text-primary rounded-full hover:bg-gray-100" 
+                  className="p-2 text-gray-600 hover:text-primary rounded-full hover:bg-gray-100" 
                   title="Print Label"
                   onClick={handlePrintLabel}
                 >
-                  <span className="material-icons">print</span>
+                  <PrinterIcon className="h-5 w-5" />
                 </button>
                 <button 
-                  className="p-1 text-gray-600 hover:text-primary rounded-full hover:bg-gray-100" 
+                  className="p-2 text-gray-600 hover:text-primary rounded-full hover:bg-gray-100" 
                   title="Edit Pallet"
                   onClick={() => setIsEditingPallet(true)}
                 >
-                  <span className="material-icons">edit</span>
+                  <EditIcon className="h-5 w-5" />
                 </button>
                 <button 
-                  className="p-1 text-gray-600 hover:text-warning rounded-full hover:bg-gray-100" 
+                  className="p-2 text-gray-600 hover:text-warning rounded-full hover:bg-gray-100" 
                   title="Actions"
                 >
-                  <span className="material-icons">more_vert</span>
+                  <MoreVerticalIcon className="h-5 w-5" />
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Lots Table */}
-        <div className="px-4 pt-2 pb-3">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot Number</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiration</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedLots.length === 0 ? (
+        {/* Lots Table - Use a different UI for TC70 devices */}
+        {isTC70Device ? (
+          // TC70 optimized lot list - card-based for touch
+          <div className="p-4 space-y-4">
+            {sortedLots.length === 0 ? (
+              <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+                <PackageIcon className="h-10 w-10 mx-auto text-gray-400 mb-2" />
+                <p className="text-gray-500">No lots added to this pallet.</p>
+                <button
+                  className="mt-4 bg-primary text-white py-3 px-6 rounded-lg text-base font-medium inline-flex items-center"
+                  onClick={() => {
+                    setEditingLot(null);
+                    setIsAddLotModalOpen(true);
+                  }}
+                >
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  Add First Lot
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-700">Lots ({sortedLots.length})</h3>
+                  <button
+                    className="bg-primary text-white py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center"
+                    onClick={() => {
+                      setEditingLot(null);
+                      setIsAddLotModalOpen(true);
+                    }}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1" />
+                    Add Lot
+                  </button>
+                </div>
+                
+                {sortedLots.map((lot) => {
+                  const isExpiringSoonFlag = isExpiringSoon(lot.expirationDate);
+                  const isExpiredFlag = isExpired(lot.expirationDate);
+                  
+                  return (
+                    <div
+                      key={lot.id}
+                      className={`p-4 rounded-lg border ${
+                        isExpiredFlag
+                          ? "bg-red-50 border-red-200"
+                          : isExpiringSoonFlag
+                          ? "bg-amber-50 border-amber-200"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-medium">{lot.lotNumber}</div>
+                        <div className="text-lg font-bold">
+                          {formatQuantity(lot.quantity)} {lot.unit}
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center">
+                          {isExpiredFlag ? (
+                            <AlertCircleIcon className="h-4 w-4 text-destructive mr-1" />
+                          ) : isExpiringSoonFlag ? (
+                            <AlertTriangleIcon className="h-4 w-4 text-warning mr-1" />
+                          ) : null}
+                          <span
+                            className={
+                              isExpiredFlag
+                                ? "text-destructive"
+                                : isExpiringSoonFlag
+                                ? "text-warning"
+                                : "text-gray-600"
+                            }
+                          >
+                            Expires: {formatDate(lot.expirationDate)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          className="flex-1 bg-secondary text-white py-3 px-4 rounded-lg font-medium text-base"
+                          onClick={() => handlePickLot(lot)}
+                        >
+                          Pick
+                        </button>
+                        <button
+                          className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium text-base"
+                          onClick={() => {
+                            setEditingLot(lot);
+                            setIsAddLotModalOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        ) : (
+          // Regular browser/tablet view - traditional table
+          <div className="px-4 pt-2 pb-3">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="px-3 py-4 text-sm text-gray-500 text-center">
-                      No lots added to this pallet. Add a lot below.
-                    </td>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot Number</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiration</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
-                ) : (
-                  sortedLots.map((lot) => {
-                    const isExpiringSoonFlag = isExpiringSoon(lot.expirationDate);
-                    const isExpiredFlag = isExpired(lot.expirationDate);
-                    
-                    return (
-                      <tr 
-                        key={lot.id} 
-                        className={isExpiredFlag ? "bg-red-50" : isExpiringSoonFlag ? "expiring-soon" : ""}
-                      >
-                        <td className="px-3 py-3 text-sm text-gray-900">{lot.lotNumber}</td>
-                        <td className="px-3 py-3 text-sm font-bold text-gray-900">{formatQuantity(lot.quantity)}</td>
-                        <td className="px-3 py-3 text-sm text-gray-900">{lot.unit}</td>
-                        <td className="px-3 py-3 text-sm text-gray-900">
-                          <div className="flex items-center">
-                            {isExpiredFlag && (
-                              <span className="material-icons text-destructive mr-1 text-sm">error</span>
-                            )}
-                            {isExpiringSoonFlag && !isExpiredFlag && (
-                              <span className="material-icons text-warning mr-1 text-sm">warning</span>
-                            )}
-                            <span className={
-                              isExpiredFlag 
-                                ? "text-destructive font-medium" 
-                                : isExpiringSoonFlag 
-                                  ? "text-warning font-medium" 
-                                  : ""
-                            }>
-                              {formatDate(lot.expirationDate)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-sm text-gray-900 text-right">
-                          <button 
-                            className="bg-secondary text-white py-1 px-3 rounded text-sm font-medium mr-2"
-                            onClick={() => handlePickLot(lot)}
-                          >
-                            Pick
-                          </button>
-                          <button 
-                            className="bg-white border border-gray-300 text-gray-700 py-1 px-3 rounded text-sm font-medium"
-                            onClick={() => {
-                              setEditingLot(lot);
-                              setIsAddLotModalOpen(true);
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedLots.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-sm text-gray-500 text-center">
+                        No lots added to this pallet. Add a lot below.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedLots.map((lot) => {
+                      const isExpiringSoonFlag = isExpiringSoon(lot.expirationDate);
+                      const isExpiredFlag = isExpired(lot.expirationDate);
+                      
+                      return (
+                        <tr 
+                          key={lot.id} 
+                          className={isExpiredFlag ? "bg-red-50" : isExpiringSoonFlag ? "expiring-soon" : ""}
+                        >
+                          <td className="px-3 py-3 text-sm text-gray-900">{lot.lotNumber}</td>
+                          <td className="px-3 py-3 text-sm font-bold text-gray-900">{formatQuantity(lot.quantity)}</td>
+                          <td className="px-3 py-3 text-sm text-gray-900">{lot.unit}</td>
+                          <td className="px-3 py-3 text-sm text-gray-900">
+                            <div className="flex items-center">
+                              {isExpiredFlag && (
+                                <AlertCircleIcon className="h-4 w-4 text-destructive mr-1" />
+                              )}
+                              {isExpiringSoonFlag && !isExpiredFlag && (
+                                <AlertTriangleIcon className="h-4 w-4 text-warning mr-1" />
+                              )}
+                              <span className={
+                                isExpiredFlag 
+                                  ? "text-destructive font-medium" 
+                                  : isExpiringSoonFlag 
+                                    ? "text-warning font-medium" 
+                                    : ""
+                              }>
+                                {formatDate(lot.expirationDate)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-900 text-right">
+                            <button 
+                              className="bg-secondary text-white py-1 px-3 rounded text-sm font-medium mr-2"
+                              onClick={() => handlePickLot(lot)}
+                            >
+                              Pick
+                            </button>
+                            <button 
+                              className="bg-white border border-gray-300 text-gray-700 py-1 px-3 rounded text-sm font-medium"
+                              onClick={() => {
+                                setEditingLot(lot);
+                                setIsAddLotModalOpen(true);
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button 
+                className="text-primary font-medium flex items-center text-sm hover:bg-gray-50 px-3 py-1 rounded"
+                onClick={() => {
+                  setEditingLot(null); // Clear any previous editing lot
+                  setIsAddLotModalOpen(true);
+                }}
+              >
+                <PlusIcon className="h-4 w-4 mr-1" />
+                Add Lot
+              </button>
+            </div>
           </div>
-          <div className="mt-3 flex justify-end">
-            <button 
-              className="text-primary font-medium flex items-center text-sm hover:bg-gray-50 px-3 py-1 rounded"
-              onClick={() => {
-                setEditingLot(null); // Clear any previous editing lot
-                setIsAddLotModalOpen(true);
-              }}
-            >
-              <span className="material-icons text-sm mr-1">add</span>
-              Add Lot
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {pickModal.isOpen && pickModal.lot && (

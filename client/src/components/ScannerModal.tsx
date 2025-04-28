@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import Quagga from "quagga";
 import { useToast } from "@/hooks/use-toast";
+import { ScanLineIcon, QrCodeIcon, CameraIcon, KeyboardIcon, SwitchCameraIcon } from "lucide-react";
 
 interface ScannerModalProps {
   onClose: () => void;
@@ -15,11 +16,51 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [manualEntry, setManualEntry] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [isTC70, setIsTC70] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Initialize scanner and check for cameras
   useEffect(() => {
+    // Check if this might be a TC70/TC75 device (based on user agent or screen size)
+    const userAgent = navigator.userAgent;
+    const isLikelyDatawedgeDevice = 
+      userAgent.includes("Android") && 
+      (userAgent.includes("TC") || 
+      userAgent.includes("MC") || 
+      userAgent.includes("ET"));
+    
+    // Also consider screen dimensions as a TC70 heuristic
+    const hasTC70Dimensions = 
+      window.screen.width <= 800 && 
+      window.screen.height <= 800 &&
+      window.screen.width >= 400;
+    
+    setIsTC70(isLikelyDatawedgeDevice || hasTC70Dimensions);
+    
+    // If it's a TC70, go straight to manual entry mode since it has a built-in scanner
+    if (isLikelyDatawedgeDevice || hasTC70Dimensions) {
+      setManualEntry(true);
+      
+      // Listen for barcode scan events from hardware scanner
+      // TC70 with DataWedge often sends events as keyboard input
+      const handleKeyDown = (e: KeyboardEvent) => {
+        // DataWedge typically finishes with an Enter key
+        if (e.key === "Enter" && manualCode) {
+          if (onScan) {
+            onScan(manualCode);
+          }
+          onClose();
+        }
+      };
+      
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+    
+    // Regular browser flow
     if (!manualEntry) {
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
@@ -158,87 +199,133 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold">Barcode Scanner</DialogTitle>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            {isTC70 ? <QrCodeIcon className="h-6 w-6" /> : <ScanLineIcon className="h-6 w-6" />}
+            <span>{isTC70 ? "TC70 Scanner" : "Barcode Scanner"}</span>
+          </DialogTitle>
         </DialogHeader>
         
-        {manualEntry ? (
+        {isTC70 ? (
+          // TC70-optimized UI with larger touch targets
           <div className="p-4">
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <QrCodeIcon className="h-8 w-8 text-blue-500" />
+                <div>
+                  <h3 className="font-medium text-blue-800">Hardware Scanner</h3>
+                  <p className="text-sm text-blue-600">
+                    Press the side scan button on your device or enter code below
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             <form onSubmit={handleManualSubmit}>
               <div className="mb-4">
-                <label htmlFor="manualCode" className="block text-sm font-medium text-gray-700 mb-1">Enter Code Manually</label>
+                <label htmlFor="manualCode" className="block text-base font-medium text-gray-700 mb-2">
+                  Barcode Value
+                </label>
                 <input
                   id="manualCode"
                   type="text"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
-                  placeholder="Enter barcode value"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  placeholder="Scan or type barcode"
                   autoFocus
                 />
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setManualEntry(false)}
-                >
-                  <span className="material-icons mr-1">camera_alt</span>
-                  Use Camera
-                </Button>
-                <Button type="submit" className="w-full">
-                  <span className="material-icons mr-1">check</span>
-                  Submit
-                </Button>
-              </div>
+              <Button 
+                type="submit" 
+                className="w-full h-14 text-lg bg-secondary hover:bg-secondary/90"
+                disabled={!manualCode.trim()}
+              >
+                Submit
+              </Button>
             </form>
           </div>
         ) : (
-          <div className="p-4">
-            <div 
-              ref={scannerRef} 
-              className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4 relative overflow-hidden"
-            >
-              <div className="w-full h-full">
-                {/* Camera view is injected here by Quagga */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
-                    {!scanResult && (
-                      <div className="text-gray-400">Center the barcode in the box</div>
-                    )}
-                  </div>
+          // Regular browser view - camera or manual entry options
+          manualEntry ? (
+            <div className="p-4">
+              <form onSubmit={handleManualSubmit}>
+                <div className="mb-4">
+                  <label htmlFor="manualCode" className="block text-sm font-medium text-gray-700 mb-1">
+                    Enter Code Manually
+                  </label>
+                  <input
+                    id="manualCode"
+                    type="text"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                    placeholder="Enter barcode value"
+                    autoFocus
+                  />
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-1 bg-primary"></div>
-                <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>
-                <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary"></div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setManualEntry(false)}
+                  >
+                    <CameraIcon className="h-4 w-4 mr-2" />
+                    Use Camera
+                  </Button>
+                  <Button type="submit" className="w-full" disabled={!manualCode.trim()}>
+                    Submit
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="p-4">
+              <div 
+                ref={scannerRef} 
+                className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4 relative overflow-hidden"
+              >
+                <div className="w-full h-full">
+                  {/* Camera view is injected here by Quagga */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
+                      {!scanResult && (
+                        <div className="text-gray-400">Center the barcode in the box</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary"></div>
+                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>
+                  <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary"></div>
+                </div>
+              </div>
+              <div className="text-center mb-4">
+                <p className="text-gray-600 mb-2">Center the barcode in the box above</p>
+                <div className="font-medium text-lg text-primary">
+                  {scanResult ? scanResult : "Ready to scan"}
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={switchCamera}
+                  disabled={cameras.length <= 1}
+                >
+                  <SwitchCameraIcon className="h-4 w-4 mr-2" />
+                  Switch Camera
+                </Button>
+                <Button 
+                  className="w-full"
+                  onClick={() => setManualEntry(true)}
+                >
+                  <KeyboardIcon className="h-4 w-4 mr-2" />
+                  Manual Entry
+                </Button>
               </div>
             </div>
-            <div className="text-center mb-4">
-              <p className="text-gray-600 mb-2">Center the barcode in the box above</p>
-              <div className="font-medium text-lg text-primary">
-                {scanResult ? scanResult : "Ready to scan"}
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={switchCamera}
-                disabled={cameras.length <= 1}
-              >
-                <span className="material-icons mr-1">flip_camera_ios</span>
-                Switch Camera
-              </Button>
-              <Button 
-                className="w-full"
-                onClick={() => setManualEntry(true)}
-              >
-                <span className="material-icons mr-1">keyboard</span>
-                Manual Entry
-              </Button>
-            </div>
-          </div>
+          )
         )}
       </DialogContent>
     </Dialog>
