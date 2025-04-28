@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, real, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 // Pallet table
 export const pallets = pgTable("pallets", {
