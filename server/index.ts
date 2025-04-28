@@ -1,8 +1,32 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import helmet from "helmet";
 
 const app = express();
+// Add Helmet for enhanced security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Vite in development
+      connectSrc: ["'self'", "ws:", "wss:"], // Allow WebSocket connections
+      imgSrc: ["'self'", "data:", "blob:"], // Allow data URIs for barcode images
+      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
+      fontSrc: ["'self'", "data:"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"], // Prevent clickjacking
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow embedding in iframes (for TC70 compatibility)
+  xssFilter: true, // Enable XSS protection
+  hsts: {
+    maxAge: 31536000, // 1 year in seconds
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
