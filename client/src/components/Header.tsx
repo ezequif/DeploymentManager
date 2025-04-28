@@ -20,9 +20,9 @@ export default function Header() {
           {/* Show "View Connections" button when more than 1 user */}
           {userCount > 1 && (
             <Button 
-              variant="outline" 
+              variant="secondary" 
               size="sm"
-              className="text-white border-white/20 hover:bg-white/10 hover:text-white"
+              className="bg-blue-600 text-white hover:bg-blue-700"
               onClick={() => setShowClientsModal(true)}
             >
               <Users className="h-4 w-4 mr-1" />
