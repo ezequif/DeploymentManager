@@ -271,22 +271,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createTransaction(validatedTransaction);
       }
       
+      const palletId = updatedLot.palletId;
+      
       // If quantity is 0 or less, delete the lot
       if (updatedLot.quantity <= 0) {
-        await storage.deleteLot(id);
+        const lotDeleted = await storage.deleteLot(id);
+        console.log(`Lot ${id} deleted: ${lotDeleted}`);
+        
+        // Get updated pallet with lots after deletion
+        const pallet = await storage.getPallet(palletId);
+        
+        // Broadcast lot deletion
+        broadcast({
+          type: 'lotDeleted',
+          data: {
+            lotId: id,
+            pallet
+          }
+        });
+      } else {
+        // Get updated pallet with lots
+        const pallet = await storage.getPallet(palletId);
+        
+        // Broadcast lot update
+        broadcast({
+          type: 'lotUpdated',
+          data: {
+            lot: updatedLot,
+            pallet
+          }
+        });
       }
-      
-      // Get updated pallet with lots
-      const pallet = await storage.getPallet(updatedLot.palletId);
-      
-      // Broadcast lot update
-      broadcast({
-        type: 'lotUpdated',
-        data: {
-          lot: updatedLot,
-          pallet
-        }
-      });
       
       res.json(updatedLot);
     } catch (error) {
