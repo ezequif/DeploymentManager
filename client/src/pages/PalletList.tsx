@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { PalletWithLots, PalletStatus } from "@shared/schema";
+import { PalletWithLots } from "@shared/schema";
+
+// Define the status types locally since there are import issues
+type PalletStatus = "active" | "archived" | "damaged";
 import { z } from "zod";
 
 import { 
@@ -27,7 +30,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// Using PalletStatus imported from schema
+// Add type assertion to handle the TypeScript error with status property
+type PalletWithStatus = PalletWithLots & { status: PalletStatus };
 
 export default function PalletList() {
   const { connected } = useWebSocket();
@@ -37,7 +41,7 @@ export default function PalletList() {
   const { toast } = useToast();
   
   // Use React Query to fetch pallets
-  const { data: apiPallets = [], isLoading } = useQuery<PalletWithLots[]>({
+  const { data: apiPallets = [], isLoading } = useQuery<PalletWithStatus[]>({
     queryKey: ['/api/pallets'],
   });
   
