@@ -22,6 +22,9 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
 
   // Initialize scanner and check for cameras
   useEffect(() => {
+    // Check if we're on mobile - important for camera selection
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
     // Check if this might be a TC70/TC75 device (based on user agent or screen size)
     const userAgent = navigator.userAgent;
     const isLikelyDatawedgeDevice = 
@@ -36,10 +39,23 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
       window.screen.height <= 800 &&
       window.screen.width >= 400;
     
-    setIsTC70(isLikelyDatawedgeDevice || hasTC70Dimensions);
+    // Store these values for later use
+    const isTC70Device = isLikelyDatawedgeDevice || hasTC70Dimensions;
+    setIsTC70(isTC70Device);
+    
+    // Only for debugging - log device info
+    console.log("Device info:", {
+      userAgent,
+      isMobile: isMobileDevice,
+      isTC70: isTC70Device,
+      protocol: window.location.protocol,
+      hostname: window.location.hostname,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height
+    });
     
     // If it's a TC70, go straight to manual entry mode since it has a built-in scanner
-    if (isLikelyDatawedgeDevice || hasTC70Dimensions) {
+    if (isTC70Device) {
       setManualEntry(true);
       
       // Listen for barcode scan events from hardware scanner
@@ -77,21 +93,55 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             setCameras(videoDevices);
             
             if (videoDevices.length > 0) {
-              // Use the back camera by default if possible
-              let selectedIndex = currentCameraIndex;
-              const backCameraIndex = videoDevices.findIndex(device => 
-                device.label.toLowerCase().includes('back') || 
-                device.label.toLowerCase().includes('rear') ||
-                device.label.toLowerCase().includes('environment')
-              );
+              // For mobile devices, we want to strongly prefer the back camera
+              // as it's much better for barcode scanning
               
-              if (backCameraIndex >= 0) {
-                selectedIndex = backCameraIndex;
-                setCurrentCameraIndex(backCameraIndex);
+              let selectedIndex = currentCameraIndex;
+              let deviceId = '';
+              
+              // First, try direct back camera access if we're on mobile
+              if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                console.log("Mobile device detected, attempting to use back camera directly");
+                
+                try {
+                  // First look for obvious back cameras in the labels
+                  const backCameraIndex = videoDevices.findIndex(device => 
+                    device.label.toLowerCase().includes('back') || 
+                    device.label.toLowerCase().includes('rear') ||
+                    device.label.toLowerCase().includes('environment')
+                  );
+                  
+                  if (backCameraIndex >= 0) {
+                    console.log("Found back camera by label:", videoDevices[backCameraIndex].label);
+                    selectedIndex = backCameraIndex;
+                    deviceId = videoDevices[backCameraIndex].deviceId;
+                  } 
+                  // If no obvious back camera, and multiple cameras exist, try the second one
+                  // (on most phones, the second camera is the back one)
+                  else if (videoDevices.length > 1) {
+                    console.log("No labeled back camera, trying second camera");
+                    selectedIndex = 1; // Second camera (index 1)
+                    deviceId = videoDevices[1].deviceId;
+                  }
+                  // Last resort, just use the first camera
+                  else {
+                    console.log("Falling back to first camera");
+                    selectedIndex = 0;
+                    deviceId = videoDevices[0].deviceId;
+                  }
+                } catch (err) {
+                  console.warn("Error selecting optimal camera:", err);
+                  // Fallback to first camera
+                  selectedIndex = 0;
+                  deviceId = videoDevices[0].deviceId;
+                }
+              } else {
+                // For non-mobile, just use the current or first camera
+                deviceId = videoDevices[currentCameraIndex < videoDevices.length ? currentCameraIndex : 0].deviceId;
               }
               
-              // Initialize with the selected camera or fallback to first camera
-              const deviceId = videoDevices[selectedIndex]?.deviceId || '';
+              // Update the current camera index for UI consistency
+              setCurrentCameraIndex(selectedIndex);
               console.log(`Initializing scanner with camera: ${videoDevices[selectedIndex]?.label || 'default'}`);
               initScanner(deviceId);
             } else {
@@ -105,19 +155,34 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             }
           })
           .catch(error => {
+            // Log the complete error for debugging
             console.error("Error accessing cameras:", error);
+            console.log("Error name:", error.name);
+            console.log("Error message:", error.message);
+            console.log("Protocol:", window.location.protocol);
+            console.log("Domain:", window.location.hostname);
             
-            // Check if we're running in Replit environment
-            const isReplitEnv = window.location.hostname.includes('replit');
+            // Create detailed error message based on the actual error
+            let errorMessage = "Could not access your device's camera.";
             
-            // Different message based on environment
-            const message = isReplitEnv 
-              ? "Camera access is not available in this environment. This feature works on actual devices."
-              : "Could not access your device's camera. Please check permissions and try again.";
+            if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+              errorMessage = "Camera access was denied. Please check your browser permissions.";
+            } else if (error.name === "NotFoundError") {
+              errorMessage = "No camera found on this device.";
+            } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+              errorMessage = "The camera is already in use by another application.";
+            } else if (error.name === "OverconstrainedError") {
+              errorMessage = "The camera does not meet the required constraints.";
+            } else if (error.name === "SecurityError") {
+              errorMessage = "This page needs HTTPS to access the camera. Try using manual entry.";
+            } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+              errorMessage = "Camera access requires HTTPS. Try using manual entry.";
+            }
             
+            // Show toast with specific error message
             toast({
               title: "Camera access error",
-              description: message,
+              description: errorMessage,
               variant: "destructive"
             });
             
@@ -323,8 +388,16 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
               <div>
                 <p className="font-medium">Camera access required</p>
                 <p className="text-blue-600 text-xs mt-1">
-                  If the camera doesn't load, please check your browser permissions and make sure camera access is allowed.
+                  Camera access requires:
                 </p>
+                <ul className="text-blue-600 text-xs list-disc ml-4 mt-1">
+                  <li>Browser permission (check camera access in settings)</li>
+                  <li>HTTPS connection (except on localhost)</li>
+                  <li>If scanning fails, try manual entry</li>
+                  {window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && (
+                    <li className="text-red-600 font-medium">⚠️ Current connection is {window.location.protocol.replace(':', '')} - camera may not work</li>
+                  )}
+                </ul>
               </div>
             </div>
           </div>
