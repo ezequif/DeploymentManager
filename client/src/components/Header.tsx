@@ -2,12 +2,21 @@ import { useState } from "react";
 import { useWebSocket } from "../lib/websocket";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { SignalHigh, SignalLow, Users, Package } from "lucide-react";
+import { SignalHigh, SignalLow, Users, Package, RefreshCw } from "lucide-react";
 import ConnectedClientsModal from "./ConnectedClientsModal";
 
 export default function Header() {
-  const { connected, userCount } = useWebSocket();
+  const { connected, userCount, syncData, lastSync } = useWebSocket();
   const [showClientsModal, setShowClientsModal] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Function to handle manual sync with animation
+  const handleSyncClick = () => {
+    setIsSyncing(true);
+    syncData();
+    // Reset animation after 2 seconds
+    setTimeout(() => setIsSyncing(false), 2000);
+  };
   
   return (
     <header className="bg-primary text-white shadow-md">
@@ -17,6 +26,32 @@ export default function Header() {
           <h1 className="text-xl font-bold">Warehouse Pallet System</h1>
         </div>
         <div className="flex items-center space-x-3">
+          {/* Sync Data Button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white hover:bg-primary-foreground/20"
+                  onClick={handleSyncClick}
+                  disabled={!connected}
+                >
+                  <RefreshCw 
+                    className={`h-5 w-5 mr-1 ${isSyncing ? 'animate-spin' : ''}`} 
+                  />
+                  <span className="text-sm">Sync</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Refresh data from server</p>
+                <p className="text-xs text-gray-400">
+                  Last sync: {lastSync.toLocaleTimeString()}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
           {/* Show "View Connections" button when more than 1 user */}
           {userCount > 1 && (
             <Button 

@@ -125,13 +125,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         
         switch (message.type) {
           case 'init':
+            console.log('Using API pallets:', message.data.pallets);
             setPallets(message.data.pallets);
             setUserCount(message.data.connectedUsers);
+            setLastSync(new Date());
             
             // Save client ID from server
             if (message.data.clientId) {
               console.log('My client ID:', message.data.clientId);
               setClientId(message.data.clientId);
+            }
+            
+            // Show a toast if this is a data sync event (not the initial connection)
+            if (connected) {
+              toast({
+                title: "Data Synchronized",
+                description: `${message.data.pallets.length} pallets loaded from server.`,
+              });
             }
             break;
             
@@ -238,7 +248,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         ws.close();
       }
     };
-  }, []);
+  }, [toast, connected]);
 
   return (
     <WebSocketContext.Provider value={{ 
