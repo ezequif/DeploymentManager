@@ -187,6 +187,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Simple ping-pong for connection testing
             ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
             break;
+           
+          case 'requestSync':
+            // Client is requesting a full data sync
+            console.log(`Client ${clientInfo.id} requested data sync`);
+            
+            // Send full data refresh to the client
+            storage.getPallets("active").then(pallets => {
+              if (ws.readyState === 1) { // WebSocket.OPEN
+                console.log(`Sending data sync to client ${clientInfo.id} with ${pallets.length} pallets`);
+                ws.send(JSON.stringify({
+                  type: 'init',
+                  data: { 
+                    pallets,
+                    connectedUsers: wss.clients.size,
+                    clientId: clientInfo.id
+                  }
+                }));
+              }
+            }).catch(err => {
+              console.error(`Failed to send sync data to client ${clientInfo.id}:`, err);
+              // Send error notification to client
+              if (ws.readyState === 1) {
+                ws.send(JSON.stringify({
+                  type: 'notification',
+                  data: {
+                    title: 'Sync Failed',
+                    description: 'Could not synchronize data from server. Please try again.'
+                  }
+                }));
+              }
+            });
+            break;
             
           default:
             console.warn(`Unknown message type from client ${clientInfo.id}: ${data.type}`);

@@ -9,6 +9,7 @@ type WebSocketContextType = {
   lastSync: Date;
   clientId: string | null;
   getConnectedClients: () => void;
+  syncData: () => void; // New function to force data refresh
 };
 
 const WebSocketContext = createContext<WebSocketContextType>({
@@ -18,6 +19,7 @@ const WebSocketContext = createContext<WebSocketContextType>({
   lastSync: new Date(),
   clientId: null,
   getConnectedClients: () => {},
+  syncData: () => {},
 });
 
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -41,6 +43,47 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       socket.send(JSON.stringify({ type: 'getConnectedClients' }));
     }
   }, [socket]);
+  
+  // Function to request a full data sync from the server
+  const syncData = useCallback(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      console.log('Requesting full data sync from server...');
+      // Tell the server to send us a full data refresh
+      socket.send(JSON.stringify({ type: 'requestSync' }));
+      toast({
+        title: "Synchronizing Data",
+        description: "Refreshing data from server..."
+      });
+    } else {
+      console.log('Cannot sync - WebSocket not connected');
+      toast({
+        title: "Sync Failed",
+        description: "Not connected to server. Try refreshing the page.",
+        variant: "destructive"
+      });
+      
+      // Also try to reload data via REST API as a fallback
+      fetch('/api/pallets')
+        .then(res => res.json())
+        .then(data => {
+          console.log('Fetched pallets via REST API:', data);
+          setPallets(data);
+          setLastSync(new Date());
+          toast({
+            title: "Data Refreshed",
+            description: "Data has been updated from server."
+          });
+        })
+        .catch(error => {
+          console.error('Failed to fetch pallets:', error);
+          toast({
+            title: "Sync Failed",
+            description: "Could not refresh data. Please try again.",
+            variant: "destructive"
+          });
+        });
+    }
+  }, [socket, toast]);
 
   useEffect(() => {
     // Create WebSocket connection
@@ -204,7 +247,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       userCount, 
       lastSync, 
       clientId,
-      getConnectedClients
+      getConnectedClients,
+      syncData
     }}>
       {children}
     </WebSocketContext.Provider>
