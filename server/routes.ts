@@ -18,6 +18,8 @@ type WSMessage = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Store intervals for cleanup when server shuts down
+  const intervals: NodeJS.Timeout[] = [];
   const httpServer = createServer(app);
 
   // Create WebSocket server with security options
@@ -59,13 +61,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return Math.random().toString(36).substring(2, 10);
   };
   
-  // Broadcast to all clients
+  // Broadcast to all clients with improved error handling and logging
   const broadcast = (message: WSMessage) => {
+    console.log(`Broadcasting message type: ${message.type} to ${wss.clients.size} clients`);
+    
+    let successCount = 0;
+    let failCount = 0;
+    
     wss.clients.forEach((client) => {
-      if (client.readyState === 1) { // WebSocket.OPEN
-        client.send(JSON.stringify(message));
+      try {
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(JSON.stringify(message));
+          successCount++;
+        } else {
+          console.log(`Client not ready (state: ${client.readyState}), skipping broadcast`);
+          failCount++;
+        }
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+        failCount++;
       }
     });
+    
+    console.log(`Broadcast complete - success: ${successCount}, failed: ${failCount}`);
   };
   
   // Get connected client details for admin purposes
@@ -83,6 +101,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return connectedClients;
   };
 
+  // Set up periodic full data sync for all clients
+  const syncInterval = setInterval(() => {
+    // Track this interval for cleanup
+    intervals.push(syncInterval);
+    // Only proceed if there are connected clients
+    if (wss.clients.size > 0) {
+      console.log('Running scheduled data sync for all clients');
+      
+      storage.getPallets("active").then(pallets => {
+        // Broadcast full data refresh to all clients
+        broadcast({
+          type: 'fullSync',
+          data: { 
+            pallets,
+            connectedUsers: wss.clients.size,
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        console.log(`Scheduled sync completed with ${pallets.length} pallets`);
+      }).catch(err => {
+        console.error('Failed to perform scheduled data sync:', err);
+      });
+    }
+  }, 60000); // Sync every 60 seconds
+  
   // WebSocket connection
   wss.on('connection', (ws, req) => {
     // Basic security check for origin

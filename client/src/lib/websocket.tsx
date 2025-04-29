@@ -92,30 +92,62 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      console.log('WebSocket connection established');
       setConnected(true);
       setLastSync(new Date());
-      // Silently connect without a toast notification
+      
+      // Show connection established notification
+      toast({
+        title: "Connection Established",
+        description: "Real-time updates are now active.",
+      });
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log(`WebSocket connection closed: code=${event.code}, reason=${event.reason || 'No reason provided'}`);
       setConnected(false);
-      // Silently try to reconnect without a toast notification
+      
+      // Show connection lost notification only if it wasn't a normal closure
+      if (event.code !== 1000 && event.code !== 1001) {
+        toast({
+          title: "Connection Lost",
+          description: "Attempting to reconnect...",
+          variant: "destructive"
+        });
+      }
       
       // Try to reconnect after 1 second
+      console.log('Attempting to reconnect in 1 second...');
       setTimeout(() => {
+        console.log('Reconnecting to WebSocket...');
         // Create new WebSocket connection
         const newWs = new WebSocket(wsUrl);
-        newWs.onopen = ws.onopen;
-        newWs.onclose = ws.onclose;
-        newWs.onerror = ws.onerror;
-        newWs.onmessage = ws.onmessage;
+        
+        // Preserve event handlers but check if they exist first (in case of errors or early closure)
+        if (ws) {
+          newWs.onopen = ws.onopen;
+          newWs.onclose = ws.onclose;
+          newWs.onerror = ws.onerror;
+          newWs.onmessage = ws.onmessage;
+        }
+        
         setSocket(newWs);
       }, 1000);
     };
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      // Silently handle error without a toast notification
+      
+      // Show error notification
+      toast({
+        title: "Connection Error",
+        description: "There was a problem with the real-time connection. Some updates may be delayed.",
+        variant: "destructive"
+      });
+      
+      // Log additional context
+      console.log('WebSocket readyState:', ws.readyState);
+      console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
     };
 
     ws.onmessage = (event) => {
