@@ -78,19 +78,19 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connection established');
       setConnected(true);
       setLastSync(new Date());
       
-      // Show connection established notification
-      toast({
-        title: "Connection Established",
-        description: "Real-time updates are now active.",
-      });
+      // Show connection established notification only when recovering from a disconnection
+      if (!connected) {
+        toast({
+          title: "Connection Established",
+          description: "Real-time updates are now active.",
+        });
+      }
     };
 
     ws.onclose = (event) => {
-      console.log(`WebSocket connection closed: code=${event.code}, reason=${event.reason || 'No reason provided'}`);
       setConnected(false);
       
       // Show connection lost notification only if it wasn't a normal closure
@@ -103,9 +103,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       }
       
       // Try to reconnect after 1 second
-      console.log('Attempting to reconnect in 1 second...');
       setTimeout(() => {
-        console.log('Reconnecting to WebSocket...');
         // Create new WebSocket connection
         const newWs = new WebSocket(wsUrl);
         
@@ -143,14 +141,13 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         
         switch (message.type) {
           case 'init':
-            console.log('Using API pallets:', message.data.pallets);
+            // Silent data loading - reduces console spam
             setPallets(message.data.pallets);
             setUserCount(message.data.connectedUsers);
             setLastSync(new Date());
             
-            // Save client ID from server
+            // Save client ID from server (silently)
             if (message.data.clientId) {
-              console.log('My client ID:', message.data.clientId);
               setClientId(message.data.clientId);
             }
             
@@ -252,7 +249,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
 
           case 'fullSync':
             // Handle automatic server-initiated data sync (every 60s)
-            console.log('Received automatic data sync from server:', message.data.timestamp);
+            // Silent data sync - no console logging
             
             // Compare pallets to detect changes
             const currentPalletIds = new Set(pallets.map(p => p.id));
