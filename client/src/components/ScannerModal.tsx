@@ -106,20 +106,37 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
           })
           .catch(error => {
             console.error("Error accessing cameras:", error);
+            
+            // Check if we're running in Replit environment
+            const isReplitEnv = window.location.hostname.includes('replit');
+            
+            // Different message based on environment
+            const message = isReplitEnv 
+              ? "Camera access is not available in this environment. This feature works on actual devices."
+              : "Could not access your device's camera. Please check permissions and try again.";
+            
             toast({
               title: "Camera access error",
-              description: "Could not access cameras. Please use manual entry.",
+              description: message,
               variant: "destructive"
             });
+            
             setManualEntry(true);
           });
       } catch (error) {
         console.error("Exception in camera initialization:", error);
+        
+        // Check if we're running in Replit environment
+        const isReplitEnv = window.location.hostname.includes('replit');
+        
         toast({
           title: "Camera initialization failed",
-          description: "Please use manual entry instead.",
+          description: isReplitEnv 
+            ? "Camera access isn't available in this environment. This feature works on actual device browsers."
+            : "Please use manual entry instead.",
           variant: "destructive"
         });
+        
         setManualEntry(true);
       }
     }
@@ -186,11 +203,18 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         }, function(err) {
           if (err) {
             console.error("Error initializing Quagga:", err);
+            
+            // Check if we're running in Replit environment
+            const isReplitEnv = window.location.hostname.includes('replit');
+            
             toast({
               title: "Scanner Error",
-              description: "Could not initialize barcode scanner. Please use manual entry.",
+              description: isReplitEnv 
+                ? "Camera scanner isn't available in the Replit environment. It will work when deployed to a real device."
+                : "Could not initialize barcode scanner. Please use manual entry.",
               variant: "destructive"
             });
+            
             setManualEntry(true);
             return;
           }
@@ -200,11 +224,18 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         });
       } catch (error) {
         console.error("Exception during Quagga initialization:", error);
+        
+        // Check if we're running in Replit environment
+        const isReplitEnv = window.location.hostname.includes('replit');
+        
         toast({
           title: "Scanner Error",
-          description: "Could not initialize barcode scanner. Please use manual entry.",
+          description: isReplitEnv 
+            ? "Camera scanner isn't available in this preview environment. This feature works on actual device browsers."
+            : "Could not initialize barcode scanner. Please use manual entry.",
           variant: "destructive"
         });
+        
         setManualEntry(true);
       }
       
