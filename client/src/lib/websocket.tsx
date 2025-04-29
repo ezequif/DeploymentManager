@@ -47,38 +47,24 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   // Function to request a full data sync from the server
   const syncData = useCallback(() => {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      console.log('Requesting full data sync from server...');
-      // Tell the server to send us a full data refresh
+      // Silent sync - Tell the server to send us a full data refresh without toast notifications
       socket.send(JSON.stringify({ type: 'requestSync' }));
-      toast({
-        title: "Synchronizing Data",
-        description: "Refreshing data from server..."
-      });
     } else {
       console.log('Cannot sync - WebSocket not connected');
-      toast({
-        title: "Sync Failed",
-        description: "Not connected to server. Try refreshing the page.",
-        variant: "destructive"
-      });
       
-      // Also try to reload data via REST API as a fallback
+      // Also try to reload data via REST API as a fallback - silently
       fetch('/api/pallets')
         .then(res => res.json())
         .then(data => {
-          console.log('Fetched pallets via REST API:', data);
           setPallets(data);
           setLastSync(new Date());
-          toast({
-            title: "Data Refreshed",
-            description: "Data has been updated from server."
-          });
         })
         .catch(error => {
           console.error('Failed to fetch pallets:', error);
+          // Only show a toast on error
           toast({
             title: "Sync Failed",
-            description: "Could not refresh data. Please try again.",
+            description: "Could not fetch data. Check your connection.",
             variant: "destructive"
           });
         });
@@ -334,14 +320,10 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
               });
             }
             
-            // If no specific changes detected, show a general sync notification
+            // If no specific changes detected, don't show any notification
+            // This reduces notification noise for routine background syncs
             if (newPallets.length === 0 && removedPallets.length === 0 && updatedLots.length === 0) {
-              // Only show a subtle notification for automatic syncs with no changes
-              toast({
-                title: "Data Synchronized",
-                description: `${message.data.pallets.length} pallets synced from server.`,
-                duration: 3000,
-              });
+              // Silent sync - no toast notification
             }
             break;
             

@@ -51,11 +51,8 @@ export default function PalletList() {
     // Sync data when the component mounts
     syncData();
     
-    // Set up an interval to refresh data every 5 seconds
-    const refreshInterval = setInterval(() => {
-      console.log("Triggering manual data refresh...");
-      syncData();
-    }, 5000);
+    // Set up an interval to refresh data - less frequent (15 seconds)
+    const refreshInterval = setInterval(syncData, 15000);
     
     // Clear interval on component unmount
     return () => clearInterval(refreshInterval);
@@ -79,13 +76,8 @@ export default function PalletList() {
   }, [wsPallets]);
   
   const pallets = useMemo(() => {
-    if (wsPallets.length > 0) {
-      console.log("Using WebSocket pallets:", wsPallets);
-      return wsPallets;
-    } else {
-      console.log("No pallets available");
-      return [];
-    }
+    // Return pallets without excessive logging
+    return wsPallets.length > 0 ? wsPallets : [];
   }, [wsPallets]);
   
   // Cast pallets to the type with status property
