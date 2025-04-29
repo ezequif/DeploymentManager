@@ -653,6 +653,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Also broadcast a full data sync to ensure all clients have the latest data
+      storage.getPallets().then(allPallets => {
+        broadcast({
+          type: 'fullSync',
+          data: {
+            timestamp: new Date().toISOString(),
+            pallets: allPallets
+          }
+        });
+      });
+      
       res.json(updatedLot);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -739,6 +750,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcast({
         type: 'transactionCreated',
         data: transaction
+      });
+      
+      // Also broadcast a full data sync to ensure all clients have the latest data
+      storage.getPallets().then(allPallets => {
+        broadcast({
+          type: 'fullSync',
+          data: {
+            timestamp: new Date().toISOString(),
+            pallets: allPallets
+          }
+        });
       });
       
       res.status(201).json(transaction);
