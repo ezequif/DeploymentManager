@@ -72,67 +72,81 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   }, [socket, toast]);
 
   useEffect(() => {
-    // Create WebSocket connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      setConnected(true);
-      setLastSync(new Date());
+    // Create WebSocket connection with exponential backoff retry
+    const createWebSocketConnection = (retryCount = 0) => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
       
-      // Show connection established notification only when recovering from a disconnection
-      if (!connected) {
-        toast({
-          title: "Connection Established",
-          description: "Real-time updates are now active.",
-        });
+      // Calculate the delay based on retry count, with a maximum of 10 seconds
+      const delay = Math.min(10000, 1000 * Math.pow(1.5, retryCount));
+      
+      try {
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          setConnected(true);
+          setLastSync(new Date());
+          
+          // Show connection established notification only when recovering from a disconnection
+          if (!connected) {
+            toast({
+              title: "Connection Established",
+              description: "Real-time updates are now active.",
+            });
+          }
+        };
+
+        ws.onclose = (event) => {
+          setConnected(false);
+          
+          // Show connection lost notification only if it wasn't a normal closure
+          if (event.code !== 1000 && event.code !== 1001) {
+            toast({
+              title: "Connection Lost",
+              description: "Attempting to reconnect...",
+              variant: "destructive"
+            });
+          }
+          
+          // Try to reconnect with exponential backoff
+          setTimeout(() => {
+            createWebSocketConnection(retryCount + 1);
+          }, delay);
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          
+          // Only show error notification if we're still connected and a new error occurs
+          if (connected) {
+            toast({
+              title: "Connection Error",
+              description: "There was a problem with the real-time connection. Some updates may be delayed.",
+              variant: "destructive"
+            });
+          }
+          
+          // Log additional context
+          console.log('WebSocket readyState:', ws.readyState);
+          console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
+        };
+        
+        setSocket(ws);
+        return ws;
+      } catch (e) {
+        console.error('Error creating WebSocket connection:', e);
+        
+        // Try to reconnect with exponential backoff
+        setTimeout(() => {
+          createWebSocketConnection(retryCount + 1);
+        }, delay);
+        
+        return null;
       }
     };
-
-    ws.onclose = (event) => {
-      setConnected(false);
-      
-      // Show connection lost notification only if it wasn't a normal closure
-      if (event.code !== 1000 && event.code !== 1001) {
-        toast({
-          title: "Connection Lost",
-          description: "Attempting to reconnect...",
-          variant: "destructive"
-        });
-      }
-      
-      // Try to reconnect after 1 second
-      setTimeout(() => {
-        // Create new WebSocket connection
-        const newWs = new WebSocket(wsUrl);
-        
-        // Preserve event handlers but check if they exist first (in case of errors or early closure)
-        if (ws) {
-          newWs.onopen = ws.onopen;
-          newWs.onclose = ws.onclose;
-          newWs.onerror = ws.onerror;
-          newWs.onmessage = ws.onmessage;
-        }
-        
-        setSocket(newWs);
-      }, 1000);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      
-      // Show error notification
-      toast({
-        title: "Connection Error",
-        description: "There was a problem with the real-time connection. Some updates may be delayed.",
-        variant: "destructive"
-      });
-      
-      // Log additional context
-      console.log('WebSocket readyState:', ws.readyState);
-      console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
-    };
+    
+    // Initialize the WebSocket connection
+    const ws = createWebSocketConnection();
 
     ws.onmessage = (event) => {
       try {
@@ -252,23 +266,32 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             // Silent data sync - no console logging
             
             // Compare pallets to detect changes
-            const currentPalletIds = new Set(pallets.map(p => p.id));
-            const newPalletIds = new Set(message.data.pallets.map(p => p.id));
+            const currentPalletIds = new Set(pallets.map((p: PalletWithLots) => p.id));
+            const newPalletIds = new Set(message.data.pallets.map((p: PalletWithLots) => p.id));
             
             // Check for new pallets
-            const newPallets = message.data.pallets.filter(p => !currentPalletIds.has(p.id));
+            const newPallets = message.data.pallets.filter((p: PalletWithLots) => !currentPalletIds.has(p.id));
             
             // Check for removed pallets
-            const removedPallets = pallets.filter(p => !newPalletIds.has(p.id));
+            const removedPallets = pallets.filter((p: PalletWithLots) => !newPalletIds.has(p.id));
             
             // Check for updated lots (quantity changes, etc.)
-            const updatedLots = [];
-            pallets.forEach(existingPallet => {
-              const newPallet = message.data.pallets.find(p => p.id === existingPallet.id);
+            type LotUpdate = {
+              palletId: string;
+              lotNumber: string;
+              oldQuantity: number;
+              newQuantity: number;
+            };
+            const updatedLots: LotUpdate[] = [];
+            pallets.forEach((existingPallet: PalletWithLots) => {
+              const newPallet = message.data.pallets.find((p: PalletWithLots) => p.id === existingPallet.id);
               if (newPallet) {
                 // Check each lot for changes
-                existingPallet.lots.forEach(existingLot => {
-                  const newLot = newPallet.lots.find(l => l.id === existingLot.id);
+                existingPallet.lots.forEach((existingLot) => {
+                  // Use proper type for the lots
+                  const newLot = newPallet.lots.find((l) => {
+                    return l.id === existingLot.id;
+                  });
                   if (newLot && newLot.quantity !== existingLot.quantity) {
                     updatedLots.push({
                       palletId: existingPallet.palletId,
@@ -288,7 +311,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             
             // Show notifications for detected changes
             if (newPallets.length > 0) {
-              newPallets.forEach(pallet => {
+              newPallets.forEach((pallet: PalletWithLots) => {
                 toast({
                   title: "New Pallet Added",
                   description: `Pallet ${pallet.palletId} (${pallet.rmNumber}) was added at ${pallet.location}.`,
@@ -298,7 +321,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             }
             
             if (removedPallets.length > 0) {
-              removedPallets.forEach(pallet => {
+              removedPallets.forEach((pallet: PalletWithLots) => {
                 toast({
                   title: "Pallet Removed",
                   description: `Pallet ${pallet.palletId} was removed.`,
@@ -308,7 +331,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             }
             
             if (updatedLots.length > 0) {
-              updatedLots.forEach(update => {
+              updatedLots.forEach((update: LotUpdate) => {
                 toast({
                   title: "Quantity Updated",
                   description: `Lot ${update.lotNumber} on pallet ${update.palletId} changed from ${update.oldQuantity} to ${update.newQuantity}.`,

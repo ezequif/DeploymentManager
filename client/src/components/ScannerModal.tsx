@@ -408,12 +408,12 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         {isTC70 ? (
           // TC70-optimized UI with larger touch targets
           <div className="p-4">
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <QrCodeIcon className="h-8 w-8 text-blue-500" />
+                <QrCodeIcon className="h-8 w-8 text-gray-500" />
                 <div>
-                  <h3 className="font-medium text-blue-800">Hardware Scanner</h3>
-                  <p className="text-sm text-blue-600">
+                  <h3 className="font-medium text-gray-800">Hardware Scanner</h3>
+                  <p className="text-sm text-gray-600">
                     Press the side scan button on your device or enter code below
                   </p>
                 </div>
