@@ -40,16 +40,26 @@ export default function PalletList() {
   const [isNewPalletModalOpen, setIsNewPalletModalOpen] = useState(false);
   const { toast } = useToast();
   
-  // Use React Query to fetch pallets
-  const { data: apiPallets = [], isLoading } = useQuery<PalletWithStatus[]>({
-    queryKey: ['/api/pallets'],
-  });
-  
-  // Also use WebSocket pallets as a backup/realtime source
-  const { pallets: wsOriginalPallets } = useWebSocket();
+  // Use WebSocket for real-time pallet data
+  const { pallets: wsOriginalPallets, syncData } = useWebSocket();
   
   // Cast the websocket pallets to include status property
   const wsPallets = wsOriginalPallets as PalletWithStatus[];
+  
+  // Force a refresh of the data on component mount
+  useEffect(() => {
+    // Sync data when the component mounts
+    syncData();
+    
+    // Set up an interval to refresh data every 5 seconds
+    const refreshInterval = setInterval(() => {
+      console.log("Triggering manual data refresh...");
+      syncData();
+    }, 5000);
+    
+    // Clear interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, [syncData]);
   
   // Function to open scan pallet modal
   const openScanPalletModal = () => {
@@ -58,20 +68,25 @@ export default function PalletList() {
     }
   };
   
-  // Combine both sources, preferring API pallets but using WebSocket as backup
-  // Use useMemo instead of state to avoid infinite update loops
+  // Use WebSocket data directly, and use a simple state flag to indicate loading
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Set loading to false once we get data
+  useEffect(() => {
+    if (wsPallets.length > 0) {
+      setIsLoading(false);
+    }
+  }, [wsPallets]);
+  
   const pallets = useMemo(() => {
-    if (apiPallets.length > 0) {
-      console.log("Using API pallets:", apiPallets);
-      return apiPallets;
-    } else if (wsPallets.length > 0) {
+    if (wsPallets.length > 0) {
       console.log("Using WebSocket pallets:", wsPallets);
       return wsPallets;
     } else {
       console.log("No pallets available");
       return [];
     }
-  }, [apiPallets, wsPallets]);
+  }, [wsPallets]);
   
   // Cast pallets to the type with status property
   const typedPallets = pallets as PalletWithStatus[];
