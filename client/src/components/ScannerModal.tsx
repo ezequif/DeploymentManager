@@ -62,31 +62,66 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     
     // Regular browser flow
     if (!manualEntry) {
-      navigator.mediaDevices.enumerateDevices()
-        .then(devices => {
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          setCameras(videoDevices);
-          
-          if (videoDevices.length > 0) {
-            initScanner(videoDevices[currentCameraIndex].deviceId);
-          } else {
+      try {
+        // First request camera permission
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            // Stop the stream immediately, we just needed permission
+            stream.getTracks().forEach(track => track.stop());
+            
+            // Now enumerate devices
+            return navigator.mediaDevices.enumerateDevices();
+          })
+          .then(devices => {
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            setCameras(videoDevices);
+            
+            if (videoDevices.length > 0) {
+              // Use the back camera by default if possible
+              let selectedIndex = currentCameraIndex;
+              const backCameraIndex = videoDevices.findIndex(device => 
+                device.label.toLowerCase().includes('back') || 
+                device.label.toLowerCase().includes('rear') ||
+                device.label.toLowerCase().includes('environment')
+              );
+              
+              if (backCameraIndex >= 0) {
+                selectedIndex = backCameraIndex;
+                setCurrentCameraIndex(backCameraIndex);
+              }
+              
+              // Initialize with the selected camera or fallback to first camera
+              const deviceId = videoDevices[selectedIndex]?.deviceId || '';
+              console.log(`Initializing scanner with camera: ${videoDevices[selectedIndex]?.label || 'default'}`);
+              initScanner(deviceId);
+            } else {
+              console.warn("No video devices found");
+              toast({
+                title: "No cameras found",
+                description: "Please use manual entry instead.",
+                variant: "destructive"
+              });
+              setManualEntry(true);
+            }
+          })
+          .catch(error => {
+            console.error("Error accessing cameras:", error);
             toast({
-              title: "No cameras found",
-              description: "Please use manual entry instead.",
+              title: "Camera access error",
+              description: "Could not access cameras. Please use manual entry.",
               variant: "destructive"
             });
             setManualEntry(true);
-          }
-        })
-        .catch(error => {
-          console.error("Error accessing cameras:", error);
-          toast({
-            title: "Camera access error",
-            description: "Could not access cameras. Please use manual entry.",
-            variant: "destructive"
           });
-          setManualEntry(true);
+      } catch (error) {
+        console.error("Exception in camera initialization:", error);
+        toast({
+          title: "Camera initialization failed",
+          description: "Please use manual entry instead.",
+          variant: "destructive"
         });
+        setManualEntry(true);
+      }
     }
     
     return () => {
@@ -97,37 +132,48 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
   // Initialize Quagga scanner
   const initScanner = (deviceId: string) => {
     if (scannerRef.current) {
-      Quagga.init({
-        inputStream: {
-          name: "Live",
-          type: "LiveStream",
-          target: scannerRef.current,
-          constraints: {
-            deviceId,
-            width: 480,
-            height: 320,
-            facingMode: "environment"
+      try {
+        Quagga.init({
+          inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: scannerRef.current,
+            constraints: {
+              width: 480,
+              height: 320,
+              facingMode: "environment",
+              // Only use deviceId if it's provided and not empty
+              ...(deviceId ? { deviceId } : {})
+            },
           },
-        },
-        decoder: {
-          readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader", "i2of5_reader"],
-          multiple: false
-        },
-        locate: true
-      }, function(err) {
-        if (err) {
-          console.error("Error initializing Quagga:", err);
-          toast({
-            title: "Scanner Error",
-            description: "Could not initialize barcode scanner. Please use manual entry.",
-            variant: "destructive"
-          });
-          setManualEntry(true);
-          return;
-        }
-        
-        Quagga.start();
-      });
+          decoder: {
+            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader", "i2of5_reader"],
+            multiple: false
+          },
+          locate: true
+        }, function(err) {
+          if (err) {
+            console.error("Error initializing Quagga:", err);
+            toast({
+              title: "Scanner Error",
+              description: "Could not initialize barcode scanner. Please use manual entry.",
+              variant: "destructive"
+            });
+            setManualEntry(true);
+            return;
+          }
+          
+          Quagga.start();
+        });
+      } catch (error) {
+        console.error("Exception during Quagga initialization:", error);
+        toast({
+          title: "Scanner Error",
+          description: "Could not initialize barcode scanner. Please use manual entry.",
+          variant: "destructive"
+        });
+        setManualEntry(true);
+      }
       
       Quagga.onDetected((result) => {
         if (result.codeResult && result.codeResult.code) {
