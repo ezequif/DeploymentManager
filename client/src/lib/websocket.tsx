@@ -267,16 +267,82 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           case 'fullSync':
             // Handle automatic server-initiated data sync (every 60s)
             console.log('Received automatic data sync from server:', message.data.timestamp);
+            
+            // Compare pallets to detect changes
+            const currentPalletIds = new Set(pallets.map(p => p.id));
+            const newPalletIds = new Set(message.data.pallets.map(p => p.id));
+            
+            // Check for new pallets
+            const newPallets = message.data.pallets.filter(p => !currentPalletIds.has(p.id));
+            
+            // Check for removed pallets
+            const removedPallets = pallets.filter(p => !newPalletIds.has(p.id));
+            
+            // Check for updated lots (quantity changes, etc.)
+            const updatedLots = [];
+            pallets.forEach(existingPallet => {
+              const newPallet = message.data.pallets.find(p => p.id === existingPallet.id);
+              if (newPallet) {
+                // Check each lot for changes
+                existingPallet.lots.forEach(existingLot => {
+                  const newLot = newPallet.lots.find(l => l.id === existingLot.id);
+                  if (newLot && newLot.quantity !== existingLot.quantity) {
+                    updatedLots.push({
+                      palletId: existingPallet.palletId,
+                      lotNumber: existingLot.lotNumber,
+                      oldQuantity: existingLot.quantity,
+                      newQuantity: newLot.quantity
+                    });
+                  }
+                });
+              }
+            });
+            
+            // Update state with new data
             setPallets(message.data.pallets);
-            setUserCount(message.data.connectedUsers);
+            setUserCount(message.data.connectedUsers || userCount);
             setLastSync(new Date());
             
-            // Only show a subtle notification for automatic syncs
-            toast({
-              title: "Data Auto-Synchronized",
-              description: `${message.data.pallets.length} pallets loaded from server.`,
-              duration: 3000, // Shorter duration for auto-sync notifications
-            });
+            // Show notifications for detected changes
+            if (newPallets.length > 0) {
+              newPallets.forEach(pallet => {
+                toast({
+                  title: "New Pallet Added",
+                  description: `Pallet ${pallet.palletId} (${pallet.rmNumber}) was added at ${pallet.location}.`,
+                  duration: 5000,
+                });
+              });
+            }
+            
+            if (removedPallets.length > 0) {
+              removedPallets.forEach(pallet => {
+                toast({
+                  title: "Pallet Removed",
+                  description: `Pallet ${pallet.palletId} was removed.`,
+                  duration: 5000,
+                });
+              });
+            }
+            
+            if (updatedLots.length > 0) {
+              updatedLots.forEach(update => {
+                toast({
+                  title: "Quantity Updated",
+                  description: `Lot ${update.lotNumber} on pallet ${update.palletId} changed from ${update.oldQuantity} to ${update.newQuantity}.`,
+                  duration: 5000,
+                });
+              });
+            }
+            
+            // If no specific changes detected, show a general sync notification
+            if (newPallets.length === 0 && removedPallets.length === 0 && updatedLots.length === 0) {
+              // Only show a subtle notification for automatic syncs with no changes
+              toast({
+                title: "Data Synchronized",
+                description: `${message.data.pallets.length} pallets synced from server.`,
+                duration: 3000,
+              });
+            }
             break;
             
           default:
