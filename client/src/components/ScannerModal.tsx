@@ -224,8 +224,9 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             type: "LiveStream",
             target: scannerRef.current,
             constraints: {
-              width: { min: 320, ideal: 720, max: 1280 },
-              height: { min: 240, ideal: 480, max: 720 },
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              // Full 16:9 or 4:3 aspect ratios
               aspectRatio: { min: 1, max: 2 },
               facingMode: "environment",
               // Only use deviceId if it's provided and not empty
@@ -483,29 +484,26 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
               <div 
                 id="scannerRef"
                 ref={scannerRef} 
-                className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4 relative overflow-hidden w-full"
-                style={{ 
-                  minHeight: "300px", 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center" 
-                }}
+                className="bg-gray-100 rounded-lg mb-4 relative w-full h-[300px]"
               >
-                {/* This div will be used by Quagga for the camera view */}
-                <div className="w-full h-full">
-                  {/* Camera view is injected here by Quagga */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
-                      {!scanResult && (
-                        <div className="text-gray-400">Center the barcode in the box</div>
-                      )}
-                    </div>
+                {/* Quagga will inject the camera view directly into this element */}
+                
+                {/* Targeting guides that float above the camera view */}
+                <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                  <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
+                    {!scanResult && (
+                      <div className="text-gray-400 text-center bg-black/20 px-2 py-1 rounded">
+                        Center the barcode in this box
+                      </div>
+                    )}
                   </div>
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary"></div>
-                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>
-                  <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary"></div>
                 </div>
+                
+                {/* Corner markers to indicate scanning area */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary z-20"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
               </div>
               <div className="text-center mb-4">
                 <p className="text-gray-600 mb-2">Center the barcode in the box above</p>

@@ -126,29 +126,48 @@
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-/* Camera and scanner styles */
+/* Camera and scanner styles - completely override Quagga's default styles */
+#scannerRef {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+/* Target all elements inside the scanner container - especially Quagga-injected elements */
 #scannerRef video,
 #scannerRef canvas,
 #scannerRef > div,
-.drawingBuffer {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-.drawingBuffer canvas,
-#scannerRef canvas {
+#scannerRef .drawingBuffer,
+#scannerRef div video,
+#scannerRef div canvas {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  transform: none !important;
 }
 
-/* Make sure Quagga properly fills the container */
-#scannerRef > div > video,
-#scannerRef > div > canvas {
+/* Ensure the viewport is centered */
+#scannerRef .viewport {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
   width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Fix for mobile Safari and Chrome */
+@media (max-width: 768px) {
+  #scannerRef video {
+    object-position: center !important;
+    left: 0 !important;
+    transform: none !important;
+  }
 }
