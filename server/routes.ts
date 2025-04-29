@@ -560,13 +560,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get updated pallet with lots
       const pallet = await storage.getPallet(lot.palletId);
       
-      // Broadcast lot creation
+      // Broadcast lot creation with specific event
       broadcast({
         type: 'lotCreated',
         data: {
           lot,
           pallet
         }
+      });
+      
+      // Also broadcast a full data sync to ensure all clients have the latest data
+      storage.getPallets().then(allPallets => {
+        broadcast({
+          type: 'fullSync',
+          data: {
+            timestamp: new Date().toISOString(),
+            pallets: allPallets
+          }
+        });
       });
       
       res.status(201).json(lot);
