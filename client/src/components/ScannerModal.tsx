@@ -385,14 +385,14 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         {/* Add camera error info if needed */}
         {!isTC70 && !manualEntry && (
           <div className="px-4 mb-2">
-            <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <div className="bg-gray-50 text-gray-800 p-3 rounded-md text-sm flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-gray-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">Camera access required</p>
-                <p className="text-blue-600 text-xs mt-1">
+                <p className="text-gray-600 text-xs mt-1">
                   Camera access requires:
                 </p>
-                <ul className="text-blue-600 text-xs list-disc ml-4 mt-1">
+                <ul className="text-gray-600 text-xs list-disc ml-4 mt-1">
                   <li>Browser permission (check camera access in settings)</li>
                   <li>HTTPS connection (except on localhost)</li>
                   <li>If scanning fails, try manual entry</li>
