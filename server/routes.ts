@@ -178,6 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }, 30000); // 30 seconds
     
+    // Track the interval for cleanup
+    intervals.push(pingInterval);
+    
     // Send current active pallets to new client
     storage.getPallets("active").then(pallets => {
       if (ws.readyState === 1) { // WebSocket.OPEN
@@ -757,6 +760,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: 'Failed to delete transaction' });
     }
+  });
+
+  // Setup cleanup for intervals and WebSocket connections
+  httpServer.on('close', () => {
+    console.log('HTTP server closing, cleaning up resources...');
+    
+    // Clear all intervals
+    intervals.forEach(interval => {
+      clearInterval(interval);
+    });
+    
+    // Close all WebSocket connections
+    wss.clients.forEach(client => {
+      if (client.readyState === 1) { // WebSocket.OPEN
+        client.close(1000, 'Server shutting down');
+      }
+    });
+    
+    console.log('All resources cleaned up');
   });
 
   return httpServer;

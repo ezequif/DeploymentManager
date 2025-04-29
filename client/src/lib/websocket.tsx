@@ -263,6 +263,21 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
               description: message.data.description,
             });
             break;
+
+          case 'fullSync':
+            // Handle automatic server-initiated data sync (every 60s)
+            console.log('Received automatic data sync from server:', message.data.timestamp);
+            setPallets(message.data.pallets);
+            setUserCount(message.data.connectedUsers);
+            setLastSync(new Date());
+            
+            // Only show a subtle notification for automatic syncs
+            toast({
+              title: "Data Auto-Synchronized",
+              description: `${message.data.pallets.length} pallets loaded from server.`,
+              duration: 3000, // Shorter duration for auto-sync notifications
+            });
+            break;
             
           default:
             console.log('Unknown message type:', message.type);
