@@ -224,13 +224,14 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             type: "LiveStream",
             target: scannerRef.current,
             constraints: {
-              width: { min: 320, ideal: 480, max: 640 },
-              height: { min: 240, ideal: 320, max: 480 },
+              width: { min: 320, ideal: 720, max: 1280 },
+              height: { min: 240, ideal: 480, max: 720 },
               aspectRatio: { min: 1, max: 2 },
               facingMode: "environment",
               // Only use deviceId if it's provided and not empty
               ...(deviceId ? { deviceId } : {})
             },
+            willReadFrequently: true,
             area: { // Only scan the center 80% of the viewport
               top: "10%",
               right: "10%",
@@ -480,12 +481,20 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
           ) : (
             <div className="p-4">
               <div 
+                id="scannerRef"
                 ref={scannerRef} 
-                className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4 relative overflow-hidden"
+                className="bg-gray-100 rounded-lg h-64 flex items-center justify-center mb-4 relative overflow-hidden w-full"
+                style={{ 
+                  minHeight: "300px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center" 
+                }}
               >
+                {/* This div will be used by Quagga for the camera view */}
                 <div className="w-full h-full">
                   {/* Camera view is injected here by Quagga */}
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
                       {!scanResult && (
                         <div className="text-gray-400">Center the barcode in the box</div>
