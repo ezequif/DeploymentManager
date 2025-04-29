@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import Quagga from "quagga";
 import { useToast } from "@/hooks/use-toast";
-import { ScanLineIcon, QrCodeIcon, CameraIcon, KeyboardIcon, SwitchCameraIcon } from "lucide-react";
+import { ScanLineIcon, QrCodeIcon, CameraIcon, KeyboardIcon, SwitchCameraIcon, AlertTriangle } from "lucide-react";
+import Quagga from "@ericblade/quagga2";
 
 interface ScannerModalProps {
   onClose: () => void;
@@ -129,28 +129,60 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     };
   }, [currentCameraIndex, manualEntry]);
 
-  // Initialize Quagga scanner
+  // Initialize Quagga scanner using improved Quagga2 library
   const initScanner = (deviceId: string) => {
     if (scannerRef.current) {
       try {
+        console.log("Initializing Quagga2 scanner with device ID:", deviceId);
+        
+        // Configure scanner with optimal settings for barcode scanning
         Quagga.init({
           inputStream: {
             name: "Live",
             type: "LiveStream",
             target: scannerRef.current,
             constraints: {
-              width: 480,
-              height: 320,
+              width: { min: 320, ideal: 480, max: 640 },
+              height: { min: 240, ideal: 320, max: 480 },
+              aspectRatio: { min: 1, max: 2 },
               facingMode: "environment",
               // Only use deviceId if it's provided and not empty
               ...(deviceId ? { deviceId } : {})
             },
+            area: { // Only scan the center 80% of the viewport
+              top: "10%",
+              right: "10%",
+              left: "10%",
+              bottom: "10%",
+            },
+            singleChannel: false // Use color camera for better detection
           },
           decoder: {
-            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader", "i2of5_reader"],
-            multiple: false
+            readers: [
+              "code_128_reader",
+              "ean_reader", 
+              "ean_8_reader", 
+              "code_39_reader", 
+              "code_39_vin_reader", 
+              "codabar_reader", 
+              "upc_reader", 
+              "upc_e_reader", 
+              "i2of5_reader"
+            ],
+            multiple: false,
+            debug: {
+              drawBoundingBox: true,
+              showFrequency: true,
+              drawScanline: true,
+              showPattern: true
+            }
+            // Frequency removed as it's not supported in this version
           },
-          locate: true
+          locate: true,
+          locator: {
+            patchSize: "medium",
+            halfSample: true
+          }
         }, function(err) {
           if (err) {
             console.error("Error initializing Quagga:", err);
@@ -163,6 +195,7 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             return;
           }
           
+          console.log("Quagga initialized successfully");
           Quagga.start();
         });
       } catch (error) {
@@ -250,6 +283,21 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             <span>{isTC70 ? "TC70 Scanner" : "Barcode Scanner"}</span>
           </DialogTitle>
         </DialogHeader>
+        
+        {/* Add camera error info if needed */}
+        {!isTC70 && !manualEntry && (
+          <div className="px-4 mb-2">
+            <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Camera access required</p>
+                <p className="text-blue-600 text-xs mt-1">
+                  If the camera doesn't load, please check your browser permissions and make sure camera access is allowed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {isTC70 ? (
           // TC70-optimized UI with larger touch targets
