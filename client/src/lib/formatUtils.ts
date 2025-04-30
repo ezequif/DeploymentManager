@@ -73,6 +73,53 @@ export function formatWeightWithUnit(value: number, unit: 'LBS' | 'KGS'): string
   return `${formatQuantity(value)} ${unit}`;
 }
 
+/**
+ * Auto-convert a weight to the preferred unit if needed
+ * @param value The weight value
+ * @param currentUnit The current unit of the weight
+ * @param preferredUnit The user's preferred unit
+ * @param autoConvert Whether auto-conversion is enabled
+ * @returns Object containing the converted value and unit
+ */
+export function autoConvertWeight(
+  value: number, 
+  currentUnit: 'LBS' | 'KGS', 
+  preferredUnit: 'LBS' | 'KGS', 
+  autoConvert: boolean
+): { value: number, unit: 'LBS' | 'KGS' } {
+  // If auto-convert is disabled or the units already match, return as-is
+  if (!autoConvert || currentUnit === preferredUnit) {
+    return { value, unit: currentUnit };
+  }
+  
+  // Otherwise, convert to the preferred unit
+  return {
+    value: convertWeight(value, currentUnit, preferredUnit),
+    unit: preferredUnit
+  };
+}
+
+/**
+ * Format weight based on user preferences for display
+ * @param value The weight value
+ * @param unit The unit of the weight
+ * @param preferredUnit The user's preferred unit
+ * @param autoConvert Whether auto-conversion is enabled
+ * @returns Formatted string with appropriate unit
+ */
+export function formatWeightForDisplay(
+  value: number, 
+  unit: 'LBS' | 'KGS', 
+  preferredUnit: 'LBS' | 'KGS', 
+  autoConvert: boolean
+): string {
+  const { value: convertedValue, unit: displayUnit } = autoConvertWeight(
+    value, unit, preferredUnit, autoConvert
+  );
+  
+  return formatWeightWithUnit(convertedValue, displayUnit);
+}
+
 // Helper function to convert date to Eastern Time for comparison
 function getEasternDateParts(date: Date): {year: number, month: number, day: number} {
   const options: Intl.DateTimeFormatOptions = { 

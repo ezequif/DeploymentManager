@@ -4,14 +4,16 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImportCSV } from "@/components/ImportCSV";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 
 export default function Settings() {
+  const { preferredUnit, setPreferredUnit, autoConvert, setAutoConvert } = useUnitSettings();
+  
   const [settings, setSettings] = useState({
     barcodeScanner: true,
-    defaultUnit: "KGS",
     expirationWarningDays: 30,
     printAutomatically: false,
     enableSounds: true,
@@ -19,6 +21,7 @@ export default function Settings() {
   
   const { toast } = useToast();
   
+  // Update unit settings
   const handleSaveSettings = () => {
     // In a real app, this would save to the server
     toast({
@@ -56,10 +59,10 @@ export default function Settings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="default-unit" className="font-medium">Default Unit</Label>
+                  <Label htmlFor="default-unit" className="font-medium">Preferred Weight Unit</Label>
                   <Select
-                    value={settings.defaultUnit}
-                    onValueChange={(value) => setSettings({...settings, defaultUnit: value})}
+                    value={preferredUnit}
+                    onValueChange={(value) => setPreferredUnit(value as "KGS" | "LBS")}
                   >
                     <SelectTrigger id="default-unit">
                       <SelectValue placeholder="Select unit" />
@@ -69,6 +72,19 @@ export default function Settings() {
                       <SelectItem value="LBS">LBS</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-gray-500">The unit that quantities will be displayed in by default</p>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto-convert-units" className="font-medium">Auto-Convert Units</Label>
+                    <p className="text-sm text-gray-500">Automatically convert between KGS and LBS when entering or displaying quantities</p>
+                  </div>
+                  <Switch 
+                    id="auto-convert-units" 
+                    checked={autoConvert}
+                    onCheckedChange={setAutoConvert}
+                  />
                 </div>
                 
                 <div className="space-y-2">

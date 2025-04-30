@@ -13,6 +13,7 @@ import ScanPalletModal from "./components/ScanPalletModal";
 import { WebSocketProvider } from "./lib/websocket";
 import { SimplifiedMobileUI } from "./components/SimplifiedUI";
 import { isTC70, getBrowserInfo } from "./lib/deviceDetection";
+import { UnitProvider } from "@/hooks/use-unit-settings";
 
 function Router() {
   return (
@@ -85,25 +86,27 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-        <TooltipProvider>
-          <Toaster />
-          
-          {isTC70Device && !forceStandardUI ? (
-            // Render the simplified UI specifically optimized for TC70 devices
-            <div className="h-screen bg-white">
-              <SimplifiedMobileUI onSwitchToStandardUI={toggleUIMode} />
-            </div>
-          ) : (
-            // Render standard UI for desktop and modern mobile devices
-            <Router />
-          )}
-          
-          {/* Scan Pallet Modal */}
-          <ScanPalletModal
-            isOpen={isScanModalOpen}
-            onClose={() => setIsScanModalOpen(false)}
-          />
-        </TooltipProvider>
+        <UnitProvider>
+          <TooltipProvider>
+            <Toaster />
+            
+            {isTC70Device && !forceStandardUI ? (
+              // Render the simplified UI specifically optimized for TC70 devices
+              <div className="h-screen bg-white">
+                <SimplifiedMobileUI onSwitchToStandardUI={toggleUIMode} />
+              </div>
+            ) : (
+              // Render standard UI for desktop and modern mobile devices
+              <Router />
+            )}
+            
+            {/* Scan Pallet Modal */}
+            <ScanPalletModal
+              isOpen={isScanModalOpen}
+              onClose={() => setIsScanModalOpen(false)}
+            />
+          </TooltipProvider>
+        </UnitProvider>
       </WebSocketProvider>
     </QueryClientProvider>
   );
