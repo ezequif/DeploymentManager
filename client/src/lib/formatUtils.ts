@@ -37,6 +37,42 @@ export function formatQuantity(quantity: number): string {
   return quantity.toFixed(1);
 }
 
+// Constants for weight conversion
+const LBS_TO_KGS_RATIO = 0.45359237; // 1 pound = 0.45359237 kilograms
+const KGS_TO_LBS_RATIO = 2.2046226218; // 1 kilogram = 2.2046226218 pounds
+
+/**
+ * Convert weight between LBS and KGS
+ * @param value The weight value to convert
+ * @param fromUnit The unit to convert from ('LBS' or 'KGS')
+ * @param toUnit The unit to convert to ('LBS' or 'KGS')
+ * @returns The converted weight value
+ */
+export function convertWeight(value: number, fromUnit: 'LBS' | 'KGS', toUnit: 'LBS' | 'KGS'): number {
+  // If units are the same, return the value unchanged
+  if (fromUnit === toUnit) return value;
+  
+  // Convert based on the direction
+  if (fromUnit === 'LBS' && toUnit === 'KGS') {
+    return value * LBS_TO_KGS_RATIO;
+  } else if (fromUnit === 'KGS' && toUnit === 'LBS') {
+    return value * KGS_TO_LBS_RATIO;
+  }
+  
+  // Fallback (should never reach here)
+  return value;
+}
+
+/**
+ * Format a weight value with its unit for display
+ * @param value The weight value
+ * @param unit The unit ('LBS' or 'KGS')
+ * @returns Formatted string (e.g., "10.5 KGS")
+ */
+export function formatWeightWithUnit(value: number, unit: 'LBS' | 'KGS'): string {
+  return `${formatQuantity(value)} ${unit}`;
+}
+
 // Helper function to convert date to Eastern Time for comparison
 function getEasternDateParts(date: Date): {year: number, month: number, day: number} {
   const options: Intl.DateTimeFormatOptions = { 

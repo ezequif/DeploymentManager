@@ -10,8 +10,9 @@ import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, QrCode } from "lucide-react";
+import { Plus, Trash2, QrCode, RefreshCw } from "lucide-react";
 import ScannerModal from "./ScannerModal";
+import { convertWeight, formatWeightWithUnit } from "@/lib/formatUtils";
 
 interface AddLotModalProps {
   pallet: PalletWithLots;
@@ -325,31 +326,73 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                     <Label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
                       Quantity*
                     </Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      step="0.1"
-                      placeholder="0.0"
-                      value={quantity || ''}
-                      onChange={(e) => setQuantity(parseFloat(e.target.value))}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="quantity"
+                        type="number"
+                        step="0.1"
+                        placeholder="0.0"
+                        value={quantity || ''}
+                        onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                      />
+                      {quantity && quantity > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          ≈ {formatWeightWithUnit(
+                              convertWeight(quantity, unit, unit === "KGS" ? "LBS" : "KGS"),
+                              unit === "KGS" ? "LBS" : "KGS"
+                            )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor="unit" className="block text-sm font-medium text-gray-700 mb-1">
                       Unit
                     </Label>
-                    <Select
-                      value={unit}
-                      onValueChange={(value) => setUnit(value as "KGS" | "LBS")}
-                    >
-                      <SelectTrigger id="unit">
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="KGS">KGS</SelectItem>
-                        <SelectItem value="LBS">LBS</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <Select
+                        value={unit}
+                        onValueChange={(value: "KGS" | "LBS") => {
+                          // When changing units, convert the quantity
+                          if (quantity && quantity > 0) {
+                            // Convert the quantity to the new unit
+                            const newQuantity = convertWeight(quantity, unit, value);
+                            setQuantity(parseFloat(newQuantity.toFixed(1)));
+                          }
+                          setUnit(value);
+                        }}
+                      >
+                        <SelectTrigger id="unit">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="KGS">KGS</SelectItem>
+                          <SelectItem value="LBS">LBS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {quantity && quantity > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Switch units and convert the quantity
+                            const newUnit = unit === "KGS" ? "LBS" : "KGS";
+                            const newQuantity = convertWeight(quantity, unit, newUnit);
+                            setQuantity(parseFloat(newQuantity.toFixed(1)));
+                            setUnit(newUnit);
+                            
+                            toast({
+                              title: "Unit Converted",
+                              description: `Converted ${quantity} ${unit} to ${formatWeightWithUnit(newQuantity, newUnit)}`
+                            });
+                          }}
+                          className="absolute right-10 top-2 text-gray-500 hover:text-primary"
+                          title="Convert units"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -419,31 +462,74 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                           <Label htmlFor={`lot-${index}-quantity`} className="block text-sm font-medium text-gray-700 mb-1">
                             Quantity*
                           </Label>
-                          <Input 
-                            id={`lot-${index}-quantity`}
-                            type="number"
-                            step="0.1"
-                            placeholder="0.0"
-                            value={lot.quantity || ''}
-                            onChange={(e) => updateLotField(index, 'quantity', parseFloat(e.target.value))}
-                          />
+                          <div className="relative">
+                            <Input 
+                              id={`lot-${index}-quantity`}
+                              type="number"
+                              step="0.1"
+                              placeholder="0.0"
+                              value={lot.quantity || ''}
+                              onChange={(e) => updateLotField(index, 'quantity', parseFloat(e.target.value))}
+                            />
+                            {lot.quantity && lot.quantity > 0 && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                ≈ {formatWeightWithUnit(
+                                    convertWeight(lot.quantity, lot.unit, lot.unit === "KGS" ? "LBS" : "KGS"),
+                                    lot.unit === "KGS" ? "LBS" : "KGS"
+                                  )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <Label htmlFor={`lot-${index}-unit`} className="block text-sm font-medium text-gray-700 mb-1">
                             Unit
                           </Label>
-                          <Select 
-                            value={lot.unit}
-                            onValueChange={(value) => updateLotField(index, 'unit', value as "KGS" | "LBS")}
-                          >
-                            <SelectTrigger id={`lot-${index}-unit`}>
-                              <SelectValue placeholder="Select unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="KGS">KGS</SelectItem>
-                              <SelectItem value="LBS">LBS</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="relative">
+                            <Select 
+                              value={lot.unit}
+                              onValueChange={(value: "KGS" | "LBS") => {
+                                // When changing units, convert the quantity if it exists
+                                if (lot.quantity && lot.quantity > 0) {
+                                  // Convert the quantity to the new unit
+                                  const newQuantity = convertWeight(lot.quantity, lot.unit, value);
+                                  updateLotField(index, 'quantity', parseFloat(newQuantity.toFixed(1)));
+                                }
+                                updateLotField(index, 'unit', value);
+                              }}
+                            >
+                              <SelectTrigger id={`lot-${index}-unit`}>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="KGS">KGS</SelectItem>
+                                <SelectItem value="LBS">LBS</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {lot.quantity && lot.quantity > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Switch units and convert the quantity
+                                  const newUnit = lot.unit === "KGS" ? "LBS" : "KGS";
+                                  const newQuantity = convertWeight(lot.quantity, lot.unit, newUnit);
+                                  
+                                  updateLotField(index, 'quantity', parseFloat(newQuantity.toFixed(1)));
+                                  updateLotField(index, 'unit', newUnit);
+                                  
+                                  toast({
+                                    title: "Unit Converted",
+                                    description: `Converted ${lot.quantity} ${lot.unit} to ${formatWeightWithUnit(newQuantity, newUnit)}`
+                                  });
+                                }}
+                                className="absolute right-10 top-2 text-gray-500 hover:text-primary"
+                                title="Convert units"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
