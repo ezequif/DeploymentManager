@@ -62,7 +62,14 @@ export default function Settings() {
                   <Label htmlFor="default-unit" className="font-medium">Preferred Weight Unit</Label>
                   <Select
                     value={preferredUnit}
-                    onValueChange={(value) => setPreferredUnit(value as "KGS" | "LBS")}
+                    onValueChange={(value) => {
+                      setPreferredUnit(value as "KGS" | "LBS");
+                      // Show feedback to user
+                      toast({
+                        title: "Unit Preference Updated",
+                        description: `Your preferred unit is now set to ${value}`,
+                      });
+                    }}
                   >
                     <SelectTrigger id="default-unit">
                       <SelectValue placeholder="Select unit" />
@@ -83,7 +90,16 @@ export default function Settings() {
                   <Switch 
                     id="auto-convert-units" 
                     checked={autoConvert}
-                    onCheckedChange={setAutoConvert}
+                    onCheckedChange={(checked) => {
+                      setAutoConvert(checked);
+                      // Show feedback to user
+                      toast({
+                        title: checked ? "Auto-Convert Enabled" : "Auto-Convert Disabled",
+                        description: checked 
+                          ? `Weights will automatically display in ${preferredUnit}`
+                          : "Weights will display in their original units",
+                      });
+                    }}
                   />
                 </div>
                 

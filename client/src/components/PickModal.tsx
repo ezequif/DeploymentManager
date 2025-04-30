@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { PalletWithLots, Lot, Pallet } from "@shared/schema";
-import { formatDate, formatQuantity } from "../lib/formatUtils";
+import { formatDate, formatQuantity, formatWeightForDisplay } from "../lib/formatUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 
 interface PickModalProps {
   pallet: PalletWithLots;
@@ -26,6 +27,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
   const [fifoCheck, setFifoCheck] = useState<{ hasOlderLots: boolean, olderLots: Array<{pallet: Pallet, lot: Lot}> } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { preferredUnit, autoConvert } = useUnitSettings();
   
   // Fetch FIFO check data when component mounts and filter based on expiration date
   useEffect(() => {
@@ -131,7 +133,12 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                       <ul className="list-disc ml-5 space-y-1">
                         {fifoCheck.olderLots.slice(0, 3).map((item, index) => (
                           <li key={index} className="font-bold">
-                            <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit}
+                            <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatWeightForDisplay(
+                              item.lot.quantity, 
+                              item.lot.unit as "KGS" | "LBS", 
+                              preferredUnit, 
+                              autoConvert
+                            )}
                           </li>
                         ))}
                         {fifoCheck.olderLots.length > 3 && (
@@ -157,7 +164,14 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                 <div className="text-sm text-gray-500">Lot Number:</div>
                 <div className="text-sm font-medium text-gray-900">{lot.lotNumber}</div>
                 <div className="text-sm text-gray-500">Available:</div>
-                <div className="text-sm font-medium text-gray-900">{lot.quantity} {lot.unit}</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {formatWeightForDisplay(
+                    lot.quantity, 
+                    lot.unit as "KGS" | "LBS", 
+                    preferredUnit, 
+                    autoConvert
+                  )}
+                </div>
                 <div className="text-sm text-gray-500">Expiration:</div>
                 <div className="text-sm font-medium text-gray-900">{formatDate(lot.expirationDate)}</div>
               </div>
@@ -182,7 +196,9 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                       }}
                       className="flex-1"
                     />
-                    <span className="ml-2 text-gray-700 font-medium">{lot.unit}</span>
+                    <span className="ml-2 text-gray-700 font-medium">
+                      {autoConvert ? preferredUnit : lot.unit}
+                    </span>
                   </div>
                   <Button 
                     type="button" 
