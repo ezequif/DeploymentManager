@@ -629,21 +629,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new pallet
+  // Create a new pallet with support for multiple lots
   app.post('/api/pallets', async (req, res) => {
     try {
       const validatedData = insertPalletSchema.parse(req.body);
       const pallet = await storage.createPallet(validatedData);
       
-      // If initial lot data was provided, create it
-      if (req.body.initialLot) {
-        const lotData = {
-          ...req.body.initialLot,
-          palletId: pallet.id
-        };
+      // Process initial lots - could be a single lot or an array of lots
+      if (req.body.initialLot || (req.body.initialLots && Array.isArray(req.body.initialLots))) {
+        // Support for both legacy single lot and new multi-lot format
+        const lotsToCreate = req.body.initialLots || (req.body.initialLot ? [req.body.initialLot] : []);
         
-        const validatedLot = insertLotSchema.parse(lotData);
-        const lot = await storage.createLot(validatedLot);
+        for (const lotData of lotsToCreate) {
+          if (lotData && lotData.lotNumber && lotData.quantity) {
+            const lotWithPalletId = {
+              ...lotData,
+              palletId: pallet.id
+            };
+            
+            const validatedLot = insertLotSchema.parse(lotWithPalletId);
+            await storage.createLot(validatedLot);
+          }
+        }
       }
       
       const palletWithLots = await storage.getPallet(pallet.id);
@@ -659,7 +666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Validation error', errors: error.errors });
       }
-      res.status(500).json({ message: 'Failed to create pallet' });
+      console.error('Error creating pallet:', error);
+      res.status(500).json({ message: 'Failed to create pallet', error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -769,52 +777,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new lot for a pallet
+  // Create new lots for a pallet - supports single lot or multiple lots
   app.post('/api/lots', async (req, res) => {
     try {
-      const validatedData = insertLotSchema.parse(req.body);
-      const lot = await storage.createLot(validatedData);
-      
-      // Create transaction if needed
-      if (req.body.transaction) {
-        const transactionData = {
-          ...req.body.transaction,
-          lotId: lot.id // Use the newly created lot's ID
-        };
+      // Handle both single lot and multiple lots scenarios
+      if (Array.isArray(req.body)) {
+        // Multiple lots - process each one
+        const createdLots = [];
         
-        const validatedTransaction = insertTransactionSchema.parse(transactionData);
-        await storage.createTransaction(validatedTransaction);
-      }
-      
-      // Get updated pallet with lots
-      const pallet = await storage.getPallet(lot.palletId);
-      
-      // Broadcast lot creation with specific event
-      broadcast({
-        type: 'lotCreated',
-        data: {
-          lot,
-          pallet
+        for (const lotData of req.body) {
+          // Validate each lot
+          const validatedData = insertLotSchema.parse(lotData);
+          const lot = await storage.createLot(validatedData);
+          createdLots.push(lot);
+          
+          // Create transaction if needed for this lot
+          if (lotData.transaction) {
+            const transactionData = {
+              ...lotData.transaction,
+              lotId: lot.id // Use the newly created lot's ID
+            };
+            
+            const validatedTransaction = insertTransactionSchema.parse(transactionData);
+            await storage.createTransaction(validatedTransaction);
+          }
         }
-      });
-      
-      // Also broadcast a full data sync to ensure all clients have the latest data
-      storage.getPallets().then(allPallets => {
+        
+        // Get updated pallet with lots using the pallet ID from the first lot
+        if (createdLots.length > 0) {
+          const pallet = await storage.getPallet(createdLots[0].palletId);
+          
+          // Broadcast that multiple lots were created
+          broadcast({
+            type: 'multipleLotCreated',
+            data: {
+              lots: createdLots,
+              pallet
+            }
+          });
+          
+          // Also broadcast a full data sync
+          storage.getPallets().then(allPallets => {
+            broadcast({
+              type: 'fullSync',
+              data: {
+                timestamp: new Date().toISOString(),
+                pallets: allPallets
+              }
+            });
+          });
+          
+          res.status(201).json(createdLots);
+        } else {
+          throw new Error("No valid lots were provided");
+        }
+      } else {
+        // Single lot (legacy format)
+        const validatedData = insertLotSchema.parse(req.body);
+        const lot = await storage.createLot(validatedData);
+        
+        // Create transaction if needed
+        if (req.body.transaction) {
+          const transactionData = {
+            ...req.body.transaction,
+            lotId: lot.id // Use the newly created lot's ID
+          };
+          
+          const validatedTransaction = insertTransactionSchema.parse(transactionData);
+          await storage.createTransaction(validatedTransaction);
+        }
+        
+        // Get updated pallet with lots
+        const pallet = await storage.getPallet(lot.palletId);
+        
+        // Broadcast lot creation with specific event
         broadcast({
-          type: 'fullSync',
+          type: 'lotCreated',
           data: {
-            timestamp: new Date().toISOString(),
-            pallets: allPallets
+            lot,
+            pallet
           }
         });
-      });
-      
-      res.status(201).json(lot);
+        
+        // Also broadcast a full data sync
+        storage.getPallets().then(allPallets => {
+          broadcast({
+            type: 'fullSync',
+            data: {
+              timestamp: new Date().toISOString(),
+              pallets: allPallets
+            }
+          });
+        });
+        
+        res.status(201).json(lot);
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Validation error', errors: error.errors });
       }
-      res.status(500).json({ message: 'Failed to create lot' });
+      console.error('Error creating lot(s):', error);
+      res.status(500).json({ message: 'Failed to create lot(s)', error: error instanceof Error ? error.message : String(error) });
     }
   });
 
