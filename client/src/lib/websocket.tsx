@@ -30,7 +30,14 @@ type WebSocketProviderProps = {
 };
 
 export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
-  const [socket, setSocket] = useState<WebSocket | null>(null);
+  // Define a type for our polling connection return object
+  type PollingConnection = {
+    pollInterval: NodeJS.Timeout;
+    cleanup: () => void;
+  };
+  
+  // Socket can be either a WebSocket or our polling connection object
+  const [socket, setSocket] = useState<WebSocket | PollingConnection | null>(null);
   const [connected, setConnected] = useState(false);
   const [pallets, setPallets] = useState<PalletWithLots[]>([]);
   const [userCount, setUserCount] = useState(0);
@@ -40,28 +47,66 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   
   // Function to request the list of connected clients
   const getConnectedClients = useCallback(() => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: 'getConnectedClients' }));
+    if (socket && 'readyState' in socket && 'send' in socket) {
+      const ws = socket as WebSocket;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'getConnectedClients' }));
+      }
     }
   }, [socket]);
   
   // Function to request a full data sync from the server
   const syncData = useCallback(() => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      // Silent sync - Tell the server to send us a full data refresh without toast notifications
-      socket.send(JSON.stringify({ type: 'requestSync' }));
-    } else {
-      console.log('Cannot sync - WebSocket not connected');
+    let canUseWebSocket = false;
+    
+    // Check if we have a valid WebSocket connection
+    if (socket && 'readyState' in socket && 'send' in socket) {
+      const ws = socket as WebSocket;
+      if (ws.readyState === WebSocket.OPEN) {
+        // Silent sync - Tell the server to send us a full data refresh without toast notifications
+        ws.send(JSON.stringify({ type: 'requestSync' }));
+        canUseWebSocket = true;
+      }
+    }
+    
+    // If we couldn't use WebSocket, fall back to REST API
+    if (!canUseWebSocket) {
+      console.log('Cannot sync via WebSocket - using REST API fallback');
       
-      // Also try to reload data via REST API as a fallback - silently
-      fetch('/api/pallets')
-        .then(res => res.json())
+      // Try to reload data via REST API as a fallback - silently
+      const apiUrl = `${window.location.origin}/api/pallets`;
+      console.log(`Fetching from: ${apiUrl}`);
+      
+      fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store'
+        }
+      })
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Server responded with status: ${res.status}`);
+          }
+          return res.json();
+        })
         .then(data => {
-          setPallets(data);
-          setLastSync(new Date());
+          if (Array.isArray(data)) {
+            console.log(`Manual sync successful, received ${data.length} pallets`);
+            setPallets(data);
+            setLastSync(new Date());
+            setConnected(true);
+          } else {
+            console.error('Invalid data format received:', data);
+            // Still store if it's not an array but valid
+            if (data && typeof data === 'object') {
+              setPallets(data.pallets || []);
+            }
+          }
         })
         .catch(error => {
           console.error('Failed to fetch pallets:', error);
+          setConnected(false);
           // Only show a toast on error
           toast({
             title: "Sync Failed",
@@ -80,32 +125,60 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     if (isTC70()) {
       console.log('TC70 detected, using REST API polling instead of WebSockets');
       
-      // Initial data load
-      fetch('/api/pallets')
-        .then(res => res.json())
-        .then(data => {
-          setPallets(data);
-          setLastSync(new Date());
-          setConnected(true); // Mark as connected even though we're not using WebSockets
+      // Create a more robust polling mechanism with retry capability for TC70
+      const pollData = (retryAttempt = 0) => {
+        console.log(`Polling data for TC70 (attempt: ${retryAttempt})`);
+        
+        // Use a full absolute URL to avoid any path resolution issues
+        const apiUrl = `${window.location.origin}/api/pallets`;
+        console.log(`Fetching from: ${apiUrl}`);
+        
+        fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store'
+          },
+          cache: 'no-store' // Prevent caching issues
         })
-        .catch(error => {
-          console.error('Failed initial data load for TC70:', error);
-        });
-      
-      // Set up polling for TC70 devices (every 10 seconds)
-      const pollingInterval = setInterval(() => {
-        fetch('/api/pallets')
-          .then(res => res.json())
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`Server responded with status: ${res.status}`);
+            }
+            return res.json();
+          })
           .then(data => {
-            setPallets(data);
-            setLastSync(new Date());
-            setConnected(true);
+            if (Array.isArray(data)) {
+              console.log(`TC70 poll successful, received ${data.length} pallets`);
+              setPallets(data);
+              setLastSync(new Date());
+              setConnected(true);
+            } else {
+              console.error('Invalid data format received:', data);
+              // Still store if it's not an array but valid
+              if (data && typeof data === 'object') {
+                setPallets(data.pallets || []);
+              }
+            }
           })
           .catch(error => {
             console.error('Failed to poll data for TC70:', error);
             setConnected(false);
+            
+            // Implement exponential backoff for retries
+            if (retryAttempt < 5) { // Limit to 5 retry attempts
+              const delay = Math.min(30000, 1000 * Math.pow(2, retryAttempt));
+              console.log(`Will retry in ${delay}ms`);
+              setTimeout(() => pollData(retryAttempt + 1), delay);
+            }
           });
-      }, 10000);
+      };
+      
+      // Initial data load
+      pollData();
+      
+      // Set up polling for TC70 devices (every 15 seconds)
+      const pollingInterval = setInterval(() => pollData(), 15000);
       
       // Clean up interval on unmount
       return () => clearInterval(pollingInterval);
@@ -118,20 +191,74 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       if (!hasWebSocketSupport()) {
         console.log('WebSockets not supported, falling back to REST API polling');
         
-        // Initial data load
-        fetch('/api/pallets')
-          .then(res => res.json())
-          .then(data => {
-            setPallets(data);
-            setLastSync(new Date());
-            setConnected(true);
+        // Use the same robust polling mechanism we use for TC70 devices
+        const pollData = (retryAttempt = 0) => {
+          console.log(`Polling data (WebSocket fallback) (attempt: ${retryAttempt})`);
+          
+          // Use a full absolute URL to avoid any path resolution issues
+          const apiUrl = `${window.location.origin}/api/pallets`;
+          console.log(`Fetching from: ${apiUrl}`);
+          
+          fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store'
+            }
           })
-          .catch(error => {
-            console.error('Failed initial data load:', error);
-          });
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`Server responded with status: ${res.status}`);
+              }
+              return res.json();
+            })
+            .then(data => {
+              if (Array.isArray(data)) {
+                console.log(`Poll successful, received ${data.length} pallets`);
+                setPallets(data);
+                setLastSync(new Date());
+                setConnected(true);
+              } else {
+                console.error('Invalid data format received:', data);
+                if (data && typeof data === 'object') {
+                  setPallets(data.pallets || []);
+                }
+              }
+            })
+            .catch(error => {
+              console.error('Failed to poll data:', error);
+              setConnected(false);
+              
+              // Retry with exponential backoff
+              if (retryAttempt < 5) {
+                const delay = Math.min(30000, 1000 * Math.pow(2, retryAttempt));
+                console.log(`Will retry in ${delay}ms`);
+                setTimeout(() => pollData(retryAttempt + 1), delay);
+              }
+            });
+        };
         
-        // Return null to indicate we're not using WebSockets
-        return null;
+        // Initial data load and set up polling
+        pollData();
+        
+        // Polling interval that will run every 15 seconds
+        const pollingInterval = setInterval(() => pollData(), 15000);
+        
+        // Create a cleanup function for the parent useEffect
+        const cleanupPolling = () => {
+          clearInterval(pollingInterval);
+        };
+        
+        // Create an object to return the cleanup function that will
+        // be called when the component unmounts
+        const returnObj = {
+          pollInterval: pollingInterval,
+          cleanup: cleanupPolling
+        };
+        
+        // Clean up the interval on component unmount
+        // We'll handle the cleanup in the main useEffect return
+        return returnObj;
       }
       
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -212,9 +339,10 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     // Initialize the WebSocket connection if not on TC70
     const ws = createWebSocketConnection();
 
-    // Only add event handlers if WebSocket was created
-    if (ws) {
-      ws.onmessage = (event) => {
+    // Only add event handlers if WebSocket was created (not polling connection)
+    if (ws && 'onmessage' in ws) {
+      // This means we're dealing with an actual WebSocket instance
+      (ws as WebSocket).onmessage = (event: MessageEvent) => {
         try {
           const message = JSON.parse(event.data);
           setLastSync(new Date());
@@ -420,10 +548,21 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       };
     }
 
-    // Clean up the WebSocket connection
+    // Clean up the WebSocket connection or polling interval
     return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (ws) {
+        // If it's a real WebSocket
+        if ('readyState' in ws && 'close' in ws) {
+          const webSocket = ws as WebSocket;
+          if (webSocket.readyState === WebSocket.OPEN) {
+            webSocket.close();
+          }
+        }
+        // If it's our polling connection
+        else if ('cleanup' in ws && typeof ws.cleanup === 'function') {
+          const pollingConnection = ws as PollingConnection;
+          pollingConnection.cleanup();
+        }
       }
     };
   }, [toast, connected]);
