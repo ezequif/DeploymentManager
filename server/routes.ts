@@ -315,6 +315,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Routes
+  // Data Import Endpoint for CSV uploads
+  app.post('/api/import', async (req, res) => {
+    try {
+      const { data, importType } = req.body;
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        return res.status(400).json({ 
+          message: 'Invalid data format. Expected array of records.'
+        });
+      }
+      
+      if (!importType || !['pallets', 'lots', 'existing_inventory'].includes(importType)) {
+        return res.status(400).json({ 
+          message: 'Invalid import type. Expected one of: pallets, lots, existing_inventory'
+        });
+      }
+      
+      // Processing results
+      const results = {
+        insertedCount: 0,
+        errorCount: 0,
+        message: '',
+        details: [] as string[]
+      };
+      
+      // Handle import based on type
+      if (importType === 'pallets') {
+        // Import just pallets
+        for (const row of data) {
+          try {
+            // Validate required fields
+            if (!row.rmNumber || !row.location) {
+              results.errorCount++;
+              results.details.push(`Row missing required fields (rmNumber, location): ${JSON.stringify(row)}`);
+              continue;
+            }
+            
+            // Generate new pallet ID
+            const palletId = await storage.generatePalletId();
+            
+            // Create pallet
+            const palletData: InsertPallet = {
+              palletId: palletId,
+              rmNumber: row.rmNumber,
+              location: row.location,
+              status: 'active'
+            };
+            
+            await storage.createPallet(palletData);
+            results.insertedCount++;
+          } catch (error) {
+            results.errorCount++;
+            if (error instanceof Error) {
+              results.details.push(`Error processing row: ${error.message}`);
+            } else {
+              results.details.push(`Unknown error processing row`);
+            }
+          }
+        }
+      } else if (importType === 'lots') {
+        // Import lots for existing pallets
+        for (const row of data) {
+          try {
+            // Validate required fields
+            if (!row.palletId || !row.lotNumber || !row.quantity || !row.unit || !row.expirationDate) {
+              results.errorCount++;
+              results.details.push(`Row missing required fields: ${JSON.stringify(row)}`);
+              continue;
+            }
+            
+            // Find the referenced pallet
+            const pallet = await storage.getPalletByPalletId(row.palletId);
+            if (!pallet) {
+              results.errorCount++;
+              results.details.push(`Pallet with ID ${row.palletId} not found`);
+              continue;
+            }
+            
+            // Validate unit
+            const unitResult = unitSchema.safeParse(row.unit);
+            if (!unitResult.success) {
+              results.errorCount++;
+              results.details.push(`Invalid unit: ${row.unit}. Must be one of: KGS, LBS`);
+              continue;
+            }
+            
+            // Create lot
+            const lotData: InsertLot = {
+              palletId: pallet.id,
+              lotNumber: row.lotNumber,
+              quantity: parseFloat(row.quantity),
+              unit: unitResult.data as Unit,
+              expirationDate: row.expirationDate
+            };
+            
+            await storage.createLot(lotData);
+            results.insertedCount++;
+          } catch (error) {
+            results.errorCount++;
+            if (error instanceof Error) {
+              results.details.push(`Error processing row: ${error.message}`);
+            } else {
+              results.details.push(`Unknown error processing row`);
+            }
+          }
+        }
+      } else if (importType === 'existing_inventory') {
+        // Handle creating both pallets and lots in one go for existing inventory
+        // Group rows by RM number and location to create pallets first
+        const groupedByRmAndLocation: Record<string, any[]> = {};
+        
+        for (const row of data) {
+          // Validate required fields for both pallet and lot
+          if (!row.rmNumber || !row.location || !row.lotNumber || 
+              !row.quantity || !row.unit || !row.expirationDate) {
+            results.errorCount++;
+            results.details.push(`Row missing required fields: ${JSON.stringify(row)}`);
+            continue;
+          }
+          
+          const key = `${row.rmNumber}-${row.location}`;
+          if (!groupedByRmAndLocation[key]) {
+            groupedByRmAndLocation[key] = [];
+          }
+          groupedByRmAndLocation[key].push(row);
+        }
+        
+        // Process each group to create a pallet and its lots
+        for (const [key, rows] of Object.entries(groupedByRmAndLocation)) {
+          try {
+            // All rows in this group have the same RM number and location
+            const firstRow = rows[0];
+            
+            // Generate new pallet ID
+            const palletId = await storage.generatePalletId();
+            
+            // Create pallet
+            const palletData: InsertPallet = {
+              palletId: palletId,
+              rmNumber: firstRow.rmNumber,
+              location: firstRow.location,
+              status: 'active'
+            };
+            
+            const pallet = await storage.createPallet(palletData);
+            
+            // Add lots to the pallet
+            for (const row of rows) {
+              try {
+                // Validate unit
+                const unitResult = unitSchema.safeParse(row.unit);
+                if (!unitResult.success) {
+                  results.errorCount++;
+                  results.details.push(`Invalid unit for lot ${row.lotNumber}: ${row.unit}. Must be one of: KGS, LBS`);
+                  continue;
+                }
+                
+                // Create lot
+                const lotData: InsertLot = {
+                  palletId: pallet.id,
+                  lotNumber: row.lotNumber,
+                  quantity: parseFloat(row.quantity),
+                  unit: unitResult.data as Unit,
+                  expirationDate: row.expirationDate
+                };
+                
+                await storage.createLot(lotData);
+                results.insertedCount++;
+              } catch (error) {
+                results.errorCount++;
+                if (error instanceof Error) {
+                  results.details.push(`Error creating lot for pallet ${palletId}: ${error.message}`);
+                } else {
+                  results.details.push(`Unknown error creating lot for pallet ${palletId}`);
+                }
+              }
+            }
+            
+            // Count the created pallet
+            results.insertedCount++;
+          } catch (error) {
+            results.errorCount++;
+            if (error instanceof Error) {
+              results.details.push(`Error creating pallet group ${key}: ${error.message}`);
+            } else {
+              results.details.push(`Unknown error creating pallet group ${key}`);
+            }
+          }
+        }
+      }
+      
+      // Set result message
+      if (results.errorCount === 0) {
+        results.message = `Successfully imported ${results.insertedCount} records.`;
+      } else if (results.insertedCount === 0) {
+        results.message = `Import failed. All ${results.errorCount} records had errors.`;
+      } else {
+        results.message = `Imported ${results.insertedCount} records with ${results.errorCount} errors.`;
+      }
+      
+      // After import, broadcast update to all clients
+      storage.getPallets("active").then(pallets => {
+        broadcast({
+          type: 'fullSync',
+          data: { 
+            pallets,
+            connectedUsers: wss.clients.size,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }).catch(err => {
+        console.error('Failed to broadcast after import:', err);
+      });
+      
+      res.json(results);
+    } catch (error) {
+      console.error('Import error:', error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : 'An unknown error occurred during import',
+        errorCount: data?.length || 0,
+        insertedCount: 0
+      });
+    }
+  });
+  
   // Get connected clients info (admin endpoint)
   app.get('/api/connected-clients', async (req, res) => {
     try {
