@@ -37,7 +37,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   };
   
   // Socket can be either a WebSocket or our polling connection object
-  const [socket, setSocket] = useState<WebSocket | PollingConnection | null>(null);
+  type WSConnection = WebSocket | PollingConnection | null;
+  const [socket, setSocket] = useState<WSConnection>(null);
   const [connected, setConnected] = useState(false);
   const [pallets, setPallets] = useState<PalletWithLots[]>([]);
   const [userCount, setUserCount] = useState(0);

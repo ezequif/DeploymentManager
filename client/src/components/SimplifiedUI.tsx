@@ -10,10 +10,14 @@ import { QrCode } from 'lucide-react';
  * This component provides a minimal, high-contrast interface focused on performance
  * with reduced animations, simpler rendering, and optimized for older browsers
  */
-export function SimplifiedMobileUI() {
+interface SimplifiedMobileUIProps {
+  onSwitchToStandardUI?: () => void;
+}
+
+export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIProps) {
   // Force sync data when component loads - essential for TC70 devices
   // that might not support WebSockets properly
-  const { pallets, syncData } = useWebSocket();
+  const { pallets, syncData, connected, lastSync } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);
   
@@ -88,13 +92,21 @@ export function SimplifiedMobileUI() {
         </div>
         
         <div className="flex justify-between items-center mb-2">
-          <span>{filteredPallets.length} pallets</span>
+          <div className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            <span>{filteredPallets.length} pallets</span>
+          </div>
           <button 
             onClick={syncData}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm flex items-center gap-1"
           >
-            Refresh
+            <span className="inline-block">↻</span>
+            <span>Refresh</span>
           </button>
+        </div>
+        
+        <div className="text-xs text-gray-500 mb-2">
+          Last updated: {lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
         </div>
         
         <button 
@@ -123,6 +135,21 @@ export function SimplifiedMobileUI() {
               onClick={() => setSelectedPallet(pallet)} 
             />
           ))}
+        </div>
+      )}
+      
+      {/* Button to switch to standard UI */}
+      {onSwitchToStandardUI && (
+        <div className="mt-4 border-t pt-2">
+          <button
+            onClick={onSwitchToStandardUI}
+            className="w-full p-2 bg-gray-200 rounded text-center text-gray-700"
+          >
+            Switch to Standard Interface
+          </button>
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            If you're having issues with this simplified interface, you can switch to the standard interface.
+          </p>
         </div>
       )}
     </div>
