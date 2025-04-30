@@ -90,34 +90,32 @@ export function createPalletLabel(palletId: string, rmNumber: string, location: 
   return container;
 }
 
-// Print the label - improved to work better with popup blockers
+// Print the label - even more direct approach
 export function printPalletLabel(palletId: string, rmNumber: string, location: string): void {
-  // Create the label
-  const label = createPalletLabel(palletId, rmNumber, location);
+  // Display a success message first
+  toast({
+    title: "Preparing Label",
+    description: `Preparing pallet ${palletId} label for printing...`,
+  });
+
+  // Create a temporary div to hold our print content
+  const printDiv = document.createElement('div');
+  printDiv.id = 'print-container';
+  printDiv.style.position = 'absolute';
+  printDiv.style.left = '-9999px';
+  printDiv.style.top = '-9999px';
+  document.body.appendChild(printDiv);
   
-  // Create a hidden iframe for printing
-  let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
+  // Store the current body content
+  const originalContent = document.body.innerHTML;
   
-  // If the iframe doesn't exist, create it
-  if (!printFrame) {
-    printFrame = document.createElement('iframe');
-    printFrame.id = 'print-frame';
-    printFrame.style.position = 'fixed';
-    printFrame.style.right = '-9999px';
-    printFrame.style.bottom = '-9999px';
-    printFrame.style.width = '8in';
-    printFrame.style.height = '2.5in';
-    printFrame.style.border = '0';
-    document.body.appendChild(printFrame);
-  }
-  
-  // Write the content to the iframe
-  const frameDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
-  
-  if (frameDoc) {
-    frameDoc.open();
-    frameDoc.write(`
-      <!DOCTYPE html>
+  try {
+    // Create the label
+    const label = createPalletLabel(palletId, rmNumber, location);
+    printDiv.appendChild(label);
+    
+    // Replace the entire body with just our print content
+    const printContent = `
       <html>
         <head>
           <title>Print Pallet Label - ${palletId}</title>
@@ -130,36 +128,75 @@ export function printPalletLabel(palletId: string, rmNumber: string, location: s
               margin: 0;
               padding: 0;
             }
+            @media print {
+              body {
+                width: 8in;
+                height: 2.5in;
+              }
+            }
           </style>
         </head>
         <body>
-          ${label.outerHTML}
+          ${printDiv.innerHTML}
         </body>
       </html>
-    `);
-    frameDoc.close();
+    `;
     
-    // Add a small delay before printing
-    setTimeout(() => {
-      try {
-        // Display a success message
-        toast({
-          title: "Printing Label",
-          description: `Sending pallet ${palletId} label to printer...`,
-        });
-        
-        // Print the iframe
-        printFrame.contentWindow?.focus();
-        printFrame.contentWindow?.print();
-      } catch (error) {
-        console.error('Error printing:', error);
-        // Show error toast
-        toast({
-          title: "Printing Error",
-          description: "Failed to print label. Please check printer settings.",
-          variant: "destructive",
-        });
-      }
-    }, 500);
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      
+      // Give the browser a moment to render the new window
+      setTimeout(() => {
+        try {
+          printWindow.focus();
+          printWindow.print();
+          
+          // Close the print window after printing or after a timeout
+          setTimeout(() => {
+            try {
+              printWindow.close();
+            } catch (e) {
+              console.error('Error closing print window:', e);
+            }
+          }, 1000);
+          
+          toast({
+            title: "Print Dialog Opened",
+            description: `Print dialog for pallet ${palletId} should now be open.`,
+          });
+        } catch (error) {
+          console.error('Error printing:', error);
+          toast({
+            title: "Printing Error",
+            description: "Failed to open print dialog. Please try again or check browser settings.",
+            variant: "destructive",
+          });
+        }
+      }, 500);
+    } else {
+      // If window.open failed (likely due to popup blocker)
+      toast({
+        title: "Printing Blocked",
+        description: "Popup blocker prevented opening the print window. Please allow popups for this site and try again.",
+        variant: "destructive",
+      });
+    }
+  } catch (error) {
+    console.error('Error in print process:', error);
+    toast({
+      title: "Printing Error",
+      description: "An unexpected error occurred during print preparation.",
+      variant: "destructive",
+    });
+  } finally {
+    // Clean up
+    if (printDiv && printDiv.parentNode) {
+      printDiv.parentNode.removeChild(printDiv);
+    }
   }
 }
