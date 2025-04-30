@@ -216,9 +216,29 @@
     transform: translateY(0) !important;
   }
   
+  /* Improved handling for keyboard showing/hiding */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS specific styles */
+    .keyboard-open .content-area {
+      padding-bottom: 45vh;
+    }
+    
+    input:focus {
+      position: relative;
+      z-index: 2;
+    }
+  }
+  
   /* Prevent content from being hidden behind the keyboard */
   .content-area {
     padding-bottom: 30vh; /* Add padding at the bottom so content isn't hidden behind keyboard */
+    will-change: transform; /* Optimize for smooth animations */
+    transition: padding-bottom 0.2s ease;
+  }
+  
+  /* Make fixed position elements work better with keyboard */
+  body.keyboard-open {
+    height: calc(100% + 50vh);
   }
   
   /* Fix for sticky position when keyboard is open */

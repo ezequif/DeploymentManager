@@ -133,9 +133,22 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                     onChange={(e) => setPalletId(e.target.value)}
                     placeholder="Enter pallet ID (e.g., PAL00001)"
                     className="pl-10 pr-12 py-6 text-lg"
+                    inputMode="search"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    onFocus={(e) => {
+                      // On mobile, scroll input into view when keyboard opens
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleSearch();
+                        // On mobile, blur the input to hide keyboard after search
+                        e.currentTarget.blur();
                       }
                     }}
                   />

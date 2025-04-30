@@ -92,103 +92,99 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
         ref={contentRef} 
         className="content-area"
       >
-      <div className="sticky-header sticky top-0 bg-white z-10 pb-2">
-        <h1 className="text-xl font-bold mb-2">Warehouse Inventory</h1>
-        
-        <div className="relative mb-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search Pallet ID, RM#, Location..."
-            className="w-full p-2 border rounded text-base"
-          />
-          {searchQuery && (
-            <button 
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
-              onClick={() => setSearchQuery('')}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-            <span>{filteredPallets.length} pallets</span>
-          </div>
-          <button 
-            onClick={syncData}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm flex items-center gap-1"
-          >
-            <span className="inline-block">↻</span>
-            <span>Refresh</span>
-          </button>
-        </div>
-        
-        <div className="text-xs text-gray-500 mb-2">
-          Last updated: {lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
-        </div>
-        
-        <button 
-          onClick={() => window.openScanPalletModal?.()}
-          className="w-full p-2 bg-orange-500 text-white rounded flex items-center justify-center gap-2 mb-2"
-        >
-          <QrCode size={20} />
-          <span>Scan Pallet</span>
-        </button>
-      </div>
-      
-      {filteredPallets.length === 0 ? (
-        <div className="p-4 text-center bg-gray-50 rounded">
-          {searchQuery ? (
-            <p>No pallets match your search</p>
-          ) : (
-            <p>No pallets found</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredPallets.map(pallet => (
-            <PalletItem 
-              key={pallet.id} 
-              pallet={pallet} 
-              onClick={() => setSelectedPallet(pallet)} 
+        <div className="sticky-header sticky top-0 bg-white z-10 pb-2">
+          <h1 className="text-xl font-bold mb-2">Warehouse Inventory</h1>
+          
+          <div className="relative mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={(e) => {
+                // On mobile, scroll the input into view when focused
+                setTimeout(() => {
+                  e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+              }}
+              placeholder="Search Pallet ID, RM#, Location..."
+              className="w-full p-2 border rounded text-base"
+              inputMode="search"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck="false"
             />
-          ))}
-        </div>
-      )}
-      
-      {/* Button to switch to standard UI */}
-      {onSwitchToStandardUI && (
-        <div className="mt-4 border-t pt-2">
-          <button
-            onClick={onSwitchToStandardUI}
-            className="w-full p-2 bg-gray-200 rounded text-center text-gray-700"
+            {searchQuery && (
+              <button 
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
+                onClick={() => setSearchQuery('')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-1">
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+              <span>{filteredPallets.length} pallets</span>
+            </div>
+            <button 
+              onClick={syncData}
+              className="px-3 py-1 bg-blue-600 text-white rounded text-sm flex items-center gap-1"
+            >
+              <span className="inline-block">↻</span>
+              <span>Refresh</span>
+            </button>
+          </div>
+          
+          <div className="text-xs text-gray-500 mb-2">
+            Last updated: {lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
+          </div>
+          
+          <button 
+            onClick={() => window.openScanPalletModal?.()}
+            className="w-full p-2 bg-orange-500 text-white rounded flex items-center justify-center gap-2 mb-2"
           >
-            Switch to Standard Interface
+            <QrCode size={20} />
+            <span>Scan Pallet</span>
           </button>
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            If you're having issues with this simplified interface, you can switch to the standard interface.
-          </p>
         </div>
-      )}
-      
-      {/* Button to switch to standard UI */}
-      {onSwitchToStandardUI && (
-        <div className="mt-4 border-t pt-2">
-          <button
-            onClick={onSwitchToStandardUI}
-            className="w-full p-2 bg-gray-200 rounded text-center text-gray-700"
-          >
-            Switch to Standard Interface
-          </button>
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            If you're having issues with this simplified interface, you can switch to the standard interface.
-          </p>
-        </div>
-      )}
+        
+        {filteredPallets.length === 0 ? (
+          <div className="p-4 text-center bg-gray-50 rounded">
+            {searchQuery ? (
+              <p>No pallets match your search</p>
+            ) : (
+              <p>No pallets found</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredPallets.map(pallet => (
+              <PalletItem 
+                key={pallet.id} 
+                pallet={pallet} 
+                onClick={() => setSelectedPallet(pallet)} 
+              />
+            ))}
+          </div>
+        )}
+        
+        {/* Button to switch to standard UI */}
+        {onSwitchToStandardUI && (
+          <div className="mt-4 border-t pt-2">
+            <button
+              onClick={onSwitchToStandardUI}
+              className="w-full p-2 bg-gray-200 rounded text-center text-gray-700"
+            >
+              Switch to Standard Interface
+            </button>
+            <p className="text-xs text-gray-500 mt-1 text-center">
+              If you're having issues with this simplified interface, you can switch to the standard interface.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
