@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PalletWithLots, Lot } from '@shared/schema';
 import { useWebSocket } from '@/lib/websocket';
 import { isTC70 } from '@/lib/deviceDetection';
 import { formatDate, formatQuantity } from '@/lib/formatUtils';
 import { QrCode } from 'lucide-react';
+import { useKeyboard } from '@/hooks/use-keyboard';
 
 /**
  * A simplified UI specifically optimized for TC70 handheld devices and other low-power devices
@@ -20,6 +21,23 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
   const { pallets, syncData, connected, lastSync } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Detect keyboard opening/closing to adjust layout
+  const isKeyboardOpen = useKeyboard();
+  
+  // When keyboard opens, scroll the input into view
+  useEffect(() => {
+    if (isKeyboardOpen && contentRef.current) {
+      // Scroll to make sure input is visible
+      setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (activeElement instanceof HTMLElement) {
+          activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [isKeyboardOpen]);
   
   // When first loaded, trigger a data sync
   useEffect(() => {
@@ -69,8 +87,12 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
   }
   
   return (
-    <div className="p-2 bg-white">
-      <div className="sticky top-0 bg-white z-10 pb-2">
+    <div className={`p-2 bg-white min-h-screen ${isKeyboardOpen ? 'pb-40' : ''}`}>
+      <div 
+        ref={contentRef} 
+        className="content-area"
+      >
+      <div className="sticky-header sticky top-0 bg-white z-10 pb-2">
         <h1 className="text-xl font-bold mb-2">Warehouse Inventory</h1>
         
         <div className="relative mb-2">
@@ -152,6 +174,22 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
           </p>
         </div>
       )}
+      
+      {/* Button to switch to standard UI */}
+      {onSwitchToStandardUI && (
+        <div className="mt-4 border-t pt-2">
+          <button
+            onClick={onSwitchToStandardUI}
+            className="w-full p-2 bg-gray-200 rounded text-center text-gray-700"
+          >
+            Switch to Standard Interface
+          </button>
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            If you're having issues with this simplified interface, you can switch to the standard interface.
+          </p>
+        </div>
+      )}
+      </div>
     </div>
   );
 }
