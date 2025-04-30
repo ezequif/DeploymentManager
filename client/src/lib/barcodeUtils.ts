@@ -1,5 +1,6 @@
 import JsBarcode from 'jsbarcode';
 import { createRef } from 'react';
+import { toast } from '@/hooks/use-toast';
 
 // Generate barcode SVG element
 export function generateBarcodeSVG(value: string): SVGSVGElement {
@@ -89,15 +90,34 @@ export function createPalletLabel(palletId: string, rmNumber: string, location: 
   return container;
 }
 
-// Print the label
+// Print the label - improved to work better with popup blockers
 export function printPalletLabel(palletId: string, rmNumber: string, location: string): void {
+  // Create the label
   const label = createPalletLabel(palletId, rmNumber, location);
   
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank');
+  // Create a hidden iframe for printing
+  let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
   
-  if (printWindow) {
-    printWindow.document.write(`
+  // If the iframe doesn't exist, create it
+  if (!printFrame) {
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'print-frame';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '-9999px';
+    printFrame.style.bottom = '-9999px';
+    printFrame.style.width = '8in';
+    printFrame.style.height = '2.5in';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+  
+  // Write the content to the iframe
+  const frameDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+  
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(`
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Print Pallet Label - ${palletId}</title>
@@ -114,16 +134,32 @@ export function printPalletLabel(palletId: string, rmNumber: string, location: s
         </head>
         <body>
           ${label.outerHTML}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
+    frameDoc.close();
     
-    printWindow.document.close();
+    // Add a small delay before printing
+    setTimeout(() => {
+      try {
+        // Display a success message
+        toast({
+          title: "Printing Label",
+          description: `Sending pallet ${palletId} label to printer...`,
+        });
+        
+        // Print the iframe
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch (error) {
+        console.error('Error printing:', error);
+        // Show error toast
+        toast({
+          title: "Printing Error",
+          description: "Failed to print label. Please check printer settings.",
+          variant: "destructive",
+        });
+      }
+    }, 500);
   }
 }
