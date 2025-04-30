@@ -129,8 +129,11 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
       
       return apiRequest("POST", "/api/pallets", data);
     },
-    onSuccess: (data) => {
+    onSuccess: async (response) => {
+      // Parse the response
+      const data = await response.json();
       console.log("Pallet created successfully:", data);
+      
       // Invalidate all queries related to pallets to refresh the list
       queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
       
