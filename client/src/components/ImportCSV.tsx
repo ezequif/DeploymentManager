@@ -271,7 +271,7 @@ export function ImportCSV() {
             </div>
           </div>
           
-          <Alert variant="warning" className="mt-2">
+          <Alert className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Important</AlertTitle>
             <AlertDescription className="text-sm">

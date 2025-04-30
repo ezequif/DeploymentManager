@@ -5,7 +5,11 @@ import { storage } from "./storage";
 import { 
   insertPalletSchema, 
   insertLotSchema, 
-  insertTransactionSchema 
+  insertTransactionSchema,
+  InsertPallet,
+  InsertLot,
+  unitSchema,
+  Unit
 } from "@shared/schema";
 import { z } from "zod";
 
