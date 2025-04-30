@@ -12,8 +12,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, QrCode } from "lucide-react";
+import { Plus, Trash2, QrCode, RefreshCw } from "lucide-react";
 import ScannerModal from "./ScannerModal";
+import { convertWeight, formatWeightWithUnit } from "@/lib/formatUtils";
 
 interface NewPalletModalProps {
   isOpen: boolean;

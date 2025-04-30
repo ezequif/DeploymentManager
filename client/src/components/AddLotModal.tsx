@@ -474,7 +474,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                             {lot.quantity && lot.quantity > 0 && (
                               <div className="text-xs text-gray-500 mt-1">
                                 ≈ {formatWeightWithUnit(
-                                    convertWeight(lot.quantity, lot.unit, lot.unit === "KGS" ? "LBS" : "KGS"),
+                                    convertWeight(Number(lot.quantity), lot.unit, lot.unit === "KGS" ? "LBS" : "KGS"),
                                     lot.unit === "KGS" ? "LBS" : "KGS"
                                   )}
                               </div>
@@ -492,7 +492,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                                 // When changing units, convert the quantity if it exists
                                 if (lot.quantity && lot.quantity > 0) {
                                   // Convert the quantity to the new unit
-                                  const newQuantity = convertWeight(lot.quantity, lot.unit, value);
+                                  const newQuantity = convertWeight(Number(lot.quantity), lot.unit, value);
                                   updateLotField(index, 'quantity', parseFloat(newQuantity.toFixed(1)));
                                 }
                                 updateLotField(index, 'unit', value);
@@ -513,7 +513,9 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                                 onClick={() => {
                                   // Switch units and convert the quantity
                                   const newUnit = lot.unit === "KGS" ? "LBS" : "KGS";
-                                  const newQuantity = convertWeight(lot.quantity, lot.unit, newUnit);
+                                  // Ensure quantity is not null before conversion
+                                  if (lot.quantity === null) return;
+                                  const newQuantity = convertWeight(Number(lot.quantity), lot.unit, newUnit);
                                   
                                   updateLotField(index, 'quantity', parseFloat(newQuantity.toFixed(1)));
                                   updateLotField(index, 'unit', newUnit);
