@@ -534,7 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Import error:', error);
       res.status(500).json({ 
         message: error instanceof Error ? error.message : 'An unknown error occurred during import',
-        errorCount: data?.length || 0,
+        errorCount: req.body?.data?.length || 0,
         insertedCount: 0
       });
     }
