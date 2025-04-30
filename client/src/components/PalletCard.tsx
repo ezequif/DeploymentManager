@@ -1,11 +1,19 @@
 import { PalletWithLots, Lot } from "@shared/schema";
 import { useState, useEffect } from "react";
-import { formatDate, formatDateTime, formatQuantity, isExpiringSoon, isExpired } from "../lib/formatUtils";
+import { 
+  formatDate, 
+  formatDateTime, 
+  formatQuantity, 
+  isExpiringSoon, 
+  isExpired, 
+  formatWeightForDisplay 
+} from "../lib/formatUtils";
 import { printPalletLabel } from "../lib/barcodeUtils";
 import { apiRequest } from "../lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 import PickModal from "./PickModal";
 import AddLotModal from "./AddLotModal";
 import { 
@@ -48,6 +56,9 @@ export default function PalletCard({ pallet }: PalletCardProps) {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Get unit settings for automatic unit conversion
+  const { preferredUnit, autoConvert } = useUnitSettings();
   
   // Sort lots by expiration date (ascending)
   const sortedLots = [...pallet.lots].sort((a, b) => {
@@ -384,7 +395,12 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                       <div className="flex justify-between items-start mb-2">
                         <div className="font-medium">{lot.lotNumber}</div>
                         <div className="text-lg font-bold">
-                          {formatQuantity(lot.quantity)} {lot.unit}
+                          {formatWeightForDisplay(
+                            lot.quantity, 
+                            lot.unit as "KGS" | "LBS", 
+                            preferredUnit, 
+                            autoConvert
+                          )}
                         </div>
                       </div>
                       
@@ -477,8 +493,14 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                           }
                         >
                           <td className="px-3 py-3 text-sm text-gray-900">{lot.lotNumber}</td>
-                          <td className="px-3 py-3 text-sm font-bold text-gray-900">{formatQuantity(lot.quantity)}</td>
-                          <td className="px-3 py-3 text-sm text-gray-900">{lot.unit}</td>
+                          <td className="px-3 py-3 text-sm font-bold text-gray-900" colSpan={2}>
+                            {formatWeightForDisplay(
+                              lot.quantity, 
+                              lot.unit as "KGS" | "LBS", 
+                              preferredUnit, 
+                              autoConvert
+                            )}
+                          </td>
                           <td className="px-3 py-3 text-sm text-gray-900">
                             <div className="flex items-center">
                               {isExpiredFlag && (
