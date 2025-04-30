@@ -338,7 +338,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                       {quantity && quantity > 0 && (
                         <div className="text-xs text-gray-500 mt-1">
                           ≈ {formatWeightWithUnit(
-                              convertWeight(quantity, unit, unit === "KGS" ? "LBS" : "KGS"),
+                              convertWeight(Number(quantity), unit, unit === "KGS" ? "LBS" : "KGS"),
                               unit === "KGS" ? "LBS" : "KGS"
                             )}
                         </div>
@@ -356,7 +356,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                           // When changing units, convert the quantity
                           if (quantity && quantity > 0) {
                             // Convert the quantity to the new unit
-                            const newQuantity = convertWeight(quantity, unit, value);
+                            const newQuantity = convertWeight(Number(quantity), unit, value);
                             setQuantity(parseFloat(newQuantity.toFixed(1)));
                           }
                           setUnit(value);
@@ -377,7 +377,9 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
                           onClick={() => {
                             // Switch units and convert the quantity
                             const newUnit = unit === "KGS" ? "LBS" : "KGS";
-                            const newQuantity = convertWeight(quantity, unit, newUnit);
+                            // Ensure quantity is not null before conversion
+                            if (quantity === null) return;
+                            const newQuantity = convertWeight(Number(quantity), unit, newUnit);
                             setQuantity(parseFloat(newQuantity.toFixed(1)));
                             setUnit(newUnit);
                             
