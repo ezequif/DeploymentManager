@@ -6,10 +6,13 @@ import { formatDate, formatQuantity } from '@/lib/formatUtils';
 import { QrCode } from 'lucide-react';
 
 /**
- * A simplified UI specifically optimized for TC70 handheld devices
+ * A simplified UI specifically optimized for TC70 handheld devices and other low-power devices
  * This component provides a minimal, high-contrast interface focused on performance
+ * with reduced animations, simpler rendering, and optimized for older browsers
  */
 export function SimplifiedMobileUI() {
+  // Force sync data when component loads - essential for TC70 devices
+  // that might not support WebSockets properly
   const { pallets, syncData } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);

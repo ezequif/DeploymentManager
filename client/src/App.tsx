@@ -32,14 +32,26 @@ function App() {
   const [isTC70Device, setIsTC70Device] = useState(false);
   
   useEffect(() => {
-    // Check if this is a TC70 device when the app first loads
-    const deviceCheck = isTC70();
+    // Check if this is a TC70 device when the app first loads,
+    // or if the user has manually enabled TC70 mode via URL parameter
+    let deviceCheck = isTC70();
+    
+    // Allow forcing TC70 mode via URL for testing
+    if (window.location.search.includes('tc70=true') || window.location.search.includes('tc70=1')) {
+      deviceCheck = true;
+      console.log('TC70 mode forced via URL parameter');
+    }
+    
     setIsTC70Device(deviceCheck);
     
     // Log device information for debugging
     console.log('Device detection:', { 
       isTC70: deviceCheck,
-      browserInfo: getBrowserInfo() 
+      browserInfo: getBrowserInfo(),
+      windowDimensions: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      }
     });
   }, []);
   
