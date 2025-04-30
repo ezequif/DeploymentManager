@@ -1,6 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import { createRef } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { isMobileOrTablet } from './deviceDetection';
 
 // Generate barcode SVG element
 export function generateBarcodeSVG(value: string): SVGSVGElement {
@@ -90,14 +91,17 @@ export function createPalletLabel(palletId: string, rmNumber: string, location: 
   return container;
 }
 
-// Print the label - even more direct approach
+// Print the label with support for both desktop and mobile devices
 export function printPalletLabel(palletId: string, rmNumber: string, location: string): void {
   // Display a success message first
   toast({
     title: "Preparing Label",
     description: `Preparing pallet ${palletId} label for printing...`,
   });
-
+  
+  const isMobile = isMobileOrTablet();
+  console.log("Device is mobile or tablet:", isMobile);
+  
   // Create a temporary div to hold our print content
   const printDiv = document.createElement('div');
   printDiv.id = 'print-container';
@@ -106,43 +110,104 @@ export function printPalletLabel(palletId: string, rmNumber: string, location: s
   printDiv.style.top = '-9999px';
   document.body.appendChild(printDiv);
   
-  // Store the current body content
-  const originalContent = document.body.innerHTML;
-  
   try {
     // Create the label
     const label = createPalletLabel(palletId, rmNumber, location);
     printDiv.appendChild(label);
     
-    // Replace the entire body with just our print content
+    // Prepare the print content
     const printContent = `
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Print Pallet Label - ${palletId}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             @page {
               size: 8in 2.5in;
               margin: 0;
             }
-            body {
+            html, body {
               margin: 0;
               padding: 0;
+              width: 100%;
+              height: 100%;
+            }
+            body {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+            }
+            .label-container {
+              width: 8in;
+              height: 2.5in;
+              box-sizing: border-box;
+              border: 1px solid #ccc;
+              page-break-inside: avoid;
+            }
+            .instructions {
+              margin: 20px;
+              padding: 15px;
+              background-color: #f0f0f0;
+              border-radius: 5px;
+              max-width: 600px;
+              display: ${isMobile ? 'block' : 'none'};
             }
             @media print {
-              body {
-                width: 8in;
-                height: 2.5in;
+              .instructions { 
+                display: none; 
+              }
+              .label-container {
+                border: none;
               }
             }
           </style>
         </head>
         <body>
-          ${printDiv.innerHTML}
+          ${isMobile ? `
+            <div class="instructions">
+              <h3>Mobile Device Detected</h3>
+              <p>On mobile devices, you can:</p>
+              <ul>
+                <li>Take a screenshot of this label</li>
+                <li>Save it to your photos</li>
+                <li>Print it later from a computer</li>
+                <li>Or use the print option in your browser if available</li>
+              </ul>
+              <p><strong>Tap the label to toggle fullscreen view</strong></p>
+            </div>
+          ` : ''}
+          <div class="label-container">${printDiv.innerHTML}</div>
+          <script>
+            // For mobile: toggle fullscreen on tap
+            document.querySelector('.label-container').addEventListener('click', function() {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                  console.log('Error attempting to enable fullscreen:', err);
+                });
+              } else {
+                if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                }
+              }
+            });
+            
+            // Auto-print on desktop
+            ${!isMobile ? `
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  // Don't close immediately to allow for manual printing if auto-print fails
+                }, 1000);
+              };
+            ` : ''}
+          </script>
         </body>
       </html>
     `;
     
-    // Create a new window for printing
+    // Create a new window for displaying/printing
     const printWindow = window.open('', '_blank');
     
     if (printWindow) {
@@ -150,47 +215,46 @@ export function printPalletLabel(palletId: string, rmNumber: string, location: s
       printWindow.document.write(printContent);
       printWindow.document.close();
       
-      // Give the browser a moment to render the new window
-      setTimeout(() => {
-        try {
-          printWindow.focus();
-          printWindow.print();
-          
-          // Close the print window after printing or after a timeout
-          setTimeout(() => {
-            try {
-              printWindow.close();
-            } catch (e) {
-              console.error('Error closing print window:', e);
-            }
-          }, 1000);
-          
-          toast({
-            title: "Print Dialog Opened",
-            description: `Print dialog for pallet ${palletId} should now be open.`,
-          });
-        } catch (error) {
-          console.error('Error printing:', error);
-          toast({
-            title: "Printing Error",
-            description: "Failed to open print dialog. Please try again or check browser settings.",
-            variant: "destructive",
-          });
-        }
-      }, 500);
+      // For desktop browsers: focus and trigger print
+      if (!isMobile) {
+        // Give the browser a moment to render the new window
+        setTimeout(() => {
+          try {
+            printWindow.focus();
+            
+            toast({
+              title: "Print Dialog Opened",
+              description: `Print dialog for pallet ${palletId} should now be open.`,
+            });
+          } catch (error) {
+            console.error('Error focusing print window:', error);
+            toast({
+              title: "Printing Error",
+              description: "Failed to open print dialog. Please try again or check browser settings.",
+              variant: "destructive",
+            });
+          }
+        }, 500);
+      } else {
+        // For mobile devices: just show a success message
+        toast({
+          title: "Label Ready",
+          description: `Pallet ${palletId} label is now displayed in a new tab.`,
+        });
+      }
     } else {
       // If window.open failed (likely due to popup blocker)
       toast({
-        title: "Printing Blocked",
-        description: "Popup blocker prevented opening the print window. Please allow popups for this site and try again.",
+        title: "Popup Blocked",
+        description: "Popup blocker prevented opening the label window. Please allow popups for this site and try again.",
         variant: "destructive",
       });
     }
   } catch (error) {
     console.error('Error in print process:', error);
     toast({
-      title: "Printing Error",
-      description: "An unexpected error occurred during print preparation.",
+      title: "Error",
+      description: "An unexpected error occurred during label preparation.",
       variant: "destructive",
     });
   } finally {

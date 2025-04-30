@@ -54,6 +54,30 @@ export function isLowPowerDevice() {
   return isTC70() || /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
 }
 
+// Check if the current device is a mobile device or tablet
+export function isMobileOrTablet() {
+  // Multiple detection methods for more accurate results
+  
+  // 1. User agent detection
+  const userAgentCheck = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet|android|touch/i.test(navigator.userAgent);
+  
+  // 2. Screen size check - most tablets/phones have smaller screens
+  const screenSizeCheck = window.innerWidth <= 1024 || window.innerHeight <= 1024;
+  
+  // 3. Touch capability check
+  const touchCheck = ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0) || 
+                     // @ts-ignore - Some browsers have this property
+                     (navigator.msMaxTouchPoints > 0);
+  
+  // 4. Platform check (iOS/Android)
+  const platformCheck = /android|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
+  
+  // Combine checks for better accuracy
+  // If both user agent and at least one other check are positive, it's likely a mobile/tablet device
+  return userAgentCheck && (screenSizeCheck || touchCheck || platformCheck);
+}
+
 // Feature detection
 export function hasWebSocketSupport() {
   return typeof WebSocket !== 'undefined';
