@@ -72,20 +72,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let successCount = 0;
     let failCount = 0;
     
-    wss.clients.forEach((client) => {
+    // Convert message to string once to avoid repeated stringify operations
+    let messageStr: string;
+    try {
+      messageStr = JSON.stringify(message);
+    } catch (err) {
+      console.error('Error stringifying message for broadcast:', err);
+      console.error('Message that failed:', message);
+      return; // Exit without attempting to broadcast invalid message
+    }
+    
+    // Create a defensive copy to avoid issues if the set changes during iteration
+    const clientsArray = Array.from(wss.clients);
+    
+    for (const client of clientsArray) {
       try {
-        if (client.readyState === 1) { // WebSocket.OPEN
-          client.send(JSON.stringify(message));
+        if (client.readyState === WS.OPEN) { // Use the explicit WS.OPEN constant
+          client.send(messageStr);
           successCount++;
         } else {
           console.log(`Client not ready (state: ${client.readyState}), skipping broadcast`);
           failCount++;
+          
+          // Close connections that aren't open
+          if (client.readyState !== WS.CONNECTING) {
+            try {
+              client.terminate(); // Force close problematic connections
+            } catch (e) {
+              console.error('Error terminating stale connection:', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error sending WebSocket message:', error);
         failCount++;
+        
+        // Try to clean up failed connection
+        try {
+          client.terminate();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
-    });
+    }
     
     console.log(`Broadcast complete - success: ${successCount}, failed: ${failCount}`);
   };
@@ -131,8 +160,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 60000); // Sync every 60 seconds
   
-  // WebSocket connection
+  // Keep track of connection attempts per IP to prevent DOS attacks
+  const connectionAttempts = new Map<string, { count: number, lastAttempt: number }>();
+  
+  // Cleanup connection attempts map periodically to prevent memory leaks
+  const cleanupConnectionsInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, data] of connectionAttempts.entries()) {
+      // Remove entries older than 5 minutes
+      if (now - data.lastAttempt > 5 * 60 * 1000) {
+        connectionAttempts.delete(ip);
+      }
+    }
+  }, 60000); // Cleanup every minute
+  
+  intervals.push(cleanupConnectionsInterval);
+  
+  // WebSocket connection with enhanced security
   wss.on('connection', (ws, req) => {
+    // Extract client information early for logging
+    const ipAddress = req.headers['x-forwarded-for'] || 
+                    req.socket.remoteAddress || 
+                    'unknown';
+    const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
+    
+    // Basic rate limiting
+    const ipData = connectionAttempts.get(clientIp) || { count: 0, lastAttempt: 0 };
+    const now = Date.now();
+    
+    // Reset count if last attempt was more than 1 minute ago
+    if (now - ipData.lastAttempt > 60000) {
+      ipData.count = 0;
+    }
+    
+    ipData.count++;
+    ipData.lastAttempt = now;
+    connectionAttempts.set(clientIp, ipData);
+    
+    // Reject if too many connection attempts (more than 60 connections per minute)
+    if (ipData.count > 60) {
+      console.warn(`Connection rate limit exceeded for IP: ${clientIp}`);
+      ws.close(1008, 'Rate limit exceeded');
+      return;
+    }
+    
     // Basic security check for origin
     const origin = req.headers.origin || '';
     
@@ -146,14 +217,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Extract client information
-    const ipAddress = req.headers['x-forwarded-for'] || 
-                      req.socket.remoteAddress || 
-                      'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
+    // Set appropriate timeouts
+    ws.on('open', () => {
+      (ws as any).isAlive = true;
+    });
     
-    // Connection rate limiting (example)
-    const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
+    (ws as any).isAlive = true;
+    
+    // Get additional client information
+    const userAgent = req.headers['user-agent'] || 'unknown';
     
     // Create a unique client ID with more entropy
     const generateSecureClientId = () => {

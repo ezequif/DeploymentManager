@@ -64,9 +64,14 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     if (socket && 'readyState' in socket && 'send' in socket) {
       const ws = socket as WebSocket;
       if (ws.readyState === WebSocket.OPEN) {
-        // Silent sync - Tell the server to send us a full data refresh without toast notifications
-        ws.send(JSON.stringify({ type: 'requestSync' }));
-        canUseWebSocket = true;
+        try {
+          // Silent sync - Tell the server to send us a full data refresh without toast notifications
+          ws.send(JSON.stringify({ type: 'requestSync' }));
+          canUseWebSocket = true;
+        } catch (e) {
+          console.error("Failed to send sync request via WebSocket:", e);
+          canUseWebSocket = false;
+        }
       }
     }
     
@@ -308,12 +313,26 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           
+          // Force a fallback to REST API immediately when a WebSocket error occurs
+          console.log("WebSocket error detected, falling back to REST API");
+          setConnected(false);
+          
+          // Close the faulty connection
+          try {
+            ws.close();
+          } catch (e) {
+            console.error("Error closing WebSocket after error:", e);
+          }
+          
+          // Perform an immediate REST API fallback call
+          syncData();
+          
           // Only show error notification if we're still connected and a new error occurs
           // And not on TC70 or other low-power devices
           if (connected && !isLowPowerDevice()) {
             toast({
               title: "Connection Error",
-              description: "There was a problem with the real-time connection. Some updates may be delayed.",
+              description: "Switched to backup connection mode. Your data will still be available.",
               variant: "destructive"
             });
           }
@@ -321,6 +340,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           // Log additional context
           console.log('WebSocket readyState:', ws.readyState);
           console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
+          console.log('Using REST API fallback');
         };
         
         setSocket(ws);
