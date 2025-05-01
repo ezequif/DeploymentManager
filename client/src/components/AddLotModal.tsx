@@ -34,6 +34,9 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
   // Different UI modes
   const [isMultiLotMode, setIsMultiLotMode] = useState(!existingLot); // Enable multi-lot mode by default for adding (not editing)
   
+  // Import the unit settings
+  const { preferredUnit } = useUnitSettings();
+  
   // For single lot edit mode
   const [lotNumber, setLotNumber] = useState(existingLot?.lotNumber || "");
   const [quantity, setQuantity] = useState<number | null>(existingLot?.quantity || null);
@@ -43,9 +46,6 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
   const [expirationDate, setExpirationDate] = useState<string>(
     existingLot?.expirationDate || new Date().toISOString().split("T")[0]
   );
-  
-  // Import the unit settings
-  const { preferredUnit } = useUnitSettings();
   
   // For multi-lot mode
   const [lots, setLots] = useState<LotFormData[]>([
@@ -120,12 +120,12 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
       // Reset form
       setLotNumber("");
       setQuantity(null);
-      setUnit("KGS");
+      setUnit(preferredUnit);
       setExpirationDate(new Date().toISOString().split("T")[0]);
       setLots([{
         lotNumber: "",
         quantity: null,
-        unit: "KGS",
+        unit: preferredUnit,
         expirationDate: new Date().toISOString().split("T")[0]
       }]);
     },
@@ -184,7 +184,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
       setLots([{
         lotNumber: "",
         quantity: null,
-        unit: "KGS",
+        unit: preferredUnit,
         expirationDate: new Date().toISOString().split("T")[0]
       }]);
     },
