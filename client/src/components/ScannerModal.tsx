@@ -20,10 +20,129 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
   const scannerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Check if we're on a tablet device (for direct video mode)
+  const [isTabletDevice, setIsTabletDevice] = useState(false);
+  const [useDirectVideo, setUseDirectVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Create a direct camera video effect for tablets
+  const startDirectCameraVideo = (deviceId?: string) => {
+    if (!videoRef.current) return;
+    
+    try {
+      console.log("Trying to start direct camera video for tablet");
+      
+      navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId } : { facingMode: "environment" },
+        audio: false
+      })
+      .then(stream => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          console.log("Direct camera video started successfully");
+          toast({
+            title: "Camera started",
+            description: "Using direct video mode for better tablet compatibility"
+          });
+        }
+      })
+      .catch(err => {
+        console.error("Error starting direct camera video:", err);
+        toast({
+          title: "Camera Error",
+          description: "Could not access camera in direct mode. Try manual entry.",
+          variant: "destructive"
+        });
+        setManualEntry(true);
+      });
+    } catch (e) {
+      console.error("Exception starting direct camera:", e);
+      setManualEntry(true);
+    }
+  };
+  
+  // Capture a still image from the video feed for barcode scanning
+  const captureTabletImage = () => {
+    if (!videoRef.current || !videoRef.current.srcObject) {
+      toast({
+        title: "Camera Error",
+        description: "No camera stream available",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Create a canvas the same size as the video
+      const canvas = document.createElement('canvas');
+      const video = videoRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw the current video frame to the canvas
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error("Could not get canvas context");
+      }
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Extract the barcode value from the image
+      // For testing - just provide a UI to manually enter code
+      toast({
+        title: "Photo Captured",
+        description: "Manual entry required for tablet camera mode"
+      });
+      
+      setManualEntry(true);
+      
+      // Test: Show the image for debugging
+      console.log("Image captured, width: " + canvas.width + ", height: " + canvas.height);
+    } catch (e) {
+      console.error("Error capturing image:", e);
+      toast({
+        title: "Capture Error",
+        description: "Could not take photo. Try manual entry.",
+        variant: "destructive"
+      });
+      setManualEntry(true);
+    }
+  };
+  
+  // Stop and clean up direct video mode
+  const stopDirectCameraVideo = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+  
+  // Special effect for tablet direct video mode
+  useEffect(() => {
+    // If a tablet is using direct video mode, set it up
+    if (isTabletDevice && useDirectVideo && !manualEntry) {
+      // Start the direct camera feed for tablets
+      startDirectCameraVideo();
+      
+      // Clean up when component unmounts
+      return () => {
+        stopDirectCameraVideo();
+      };
+    }
+  }, [isTabletDevice, useDirectVideo, manualEntry]);
+
   // Initialize scanner and check for cameras
   useEffect(() => {
     // Check if we're on mobile - important for camera selection
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Check if this is a tablet specifically
+    const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+    setIsTabletDevice(isTablet);
+    
+    // Force direct video mode for tablets to avoid Quagga issues
+    setUseDirectVideo(isTablet);
     
     // Check if this might be a TC70/TC75 device (based on user agent or screen size)
     const userAgent = navigator.userAgent;
@@ -318,10 +437,7 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
                       name: "Live",
                       type: "LiveStream",
                       target: scannerRef.current,
-                      constraints: {
-                        // Completely unconstrained - let the device decide what works
-                        video: true
-                      },
+                      constraints: { facingMode: "environment" }, // Minimal constraints
                       willReadFrequently: true
                     },
                     decoder: {
@@ -552,30 +668,59 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             </div>
           ) : (
             <div className="p-4">
-              <div 
-                id="scannerRef"
-                ref={scannerRef} 
-                className="bg-gray-100 rounded-lg mb-4 relative w-full h-[300px]"
-              >
-                {/* Quagga will inject the camera view directly into this element */}
-                
-                {/* Targeting guides that float above the camera view */}
-                <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                  <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
-                    {!scanResult && (
+              {isTabletDevice && useDirectVideo ? (
+                /* Direct Video UI for tablets */
+                <div className="bg-gray-100 rounded-lg mb-4 relative w-full h-[300px] overflow-hidden">
+                  <video 
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                  
+                  {/* Targeting guides that float above the camera view */}
+                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                    <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
                       <div className="text-gray-400 text-center bg-black/20 px-2 py-1 rounded">
-                        Center the barcode in this box
+                        Tablet Direct Mode: Take a photo of the barcode
                       </div>
-                    )}
+                    </div>
                   </div>
+                  
+                  {/* Corner markers to indicate scanning area */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary z-20"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                  <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
                 </div>
-                
-                {/* Corner markers to indicate scanning area */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-20"></div>
-                <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary z-20"></div>
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary z-20"></div>
-                <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
-              </div>
+              ) : (
+                /* Standard Quagga UI for non-tablets */
+                <div 
+                  id="scannerRef"
+                  ref={scannerRef} 
+                  className="bg-gray-100 rounded-lg mb-4 relative w-full h-[300px]"
+                >
+                  {/* Quagga will inject the camera view directly into this element */}
+                  
+                  {/* Targeting guides that float above the camera view */}
+                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                    <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
+                      {!scanResult && (
+                        <div className="text-gray-400 text-center bg-black/20 px-2 py-1 rounded">
+                          Center the barcode in this box
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Corner markers to indicate scanning area */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary z-20"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary z-20"></div>
+                  <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
+                </div>
+              )}
               <div className="text-center mb-4">
                 <p className="text-gray-600 mb-2">Center the barcode in the box above</p>
                 <div className="font-medium text-lg text-primary">
