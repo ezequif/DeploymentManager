@@ -64,7 +64,6 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 // Extended types for frontend use
 export type PalletWithLots = Pallet & {
   lots: Lot[];
-  status: PalletStatus;
 };
 
 // Unit type

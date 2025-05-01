@@ -218,13 +218,13 @@ export default function PalletCard({ pallet }: PalletCardProps) {
               <PackageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               <h3 className="font-bold text-base sm:text-lg text-primary">{pallet.palletId}</h3>
               <span className={`text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
-                pallet.status === "archived" 
+                (pallet as any).status === "archived" 
                   ? "bg-amber-500" 
-                  : pallet.status === "damaged" 
+                  : (pallet as any).status === "damaged" 
                     ? "bg-red-500"
                     : "bg-primary-light"
               }`}>
-                {pallet.status ? pallet.status.charAt(0).toUpperCase() + pallet.status.slice(1) : 'Active'}
+                {((pallet as any).status || "active").charAt(0).toUpperCase() + ((pallet as any).status || "active").slice(1)}
               </span>
             </div>
             {isEditingPallet ? (
@@ -318,7 +318,7 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                       <PrinterIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                       Print Label
                     </DropdownMenuItem>
-                    {pallet.status !== "archived" && (
+                    {(pallet as any).status !== "archived" && (
                       <DropdownMenuItem 
                         className="cursor-pointer flex items-center text-amber-600 text-xs sm:text-sm"
                         onClick={() => handleArchivePallet()}
