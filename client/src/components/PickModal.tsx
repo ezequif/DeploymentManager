@@ -34,15 +34,41 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
     const fetchFifoCheck = async () => {
       try {
         setIsLoading(true);
-        // Check if there are older lots with the same RM number for FIFO checking
+        
+        // First, check for older lots within the same pallet
+        const currentLotDate = new Date(lot.expirationDate);
+        const samePalletOlderLots: Array<{pallet: Pallet, lot: Lot}> = [];
+        
+        // Check other lots in the same pallet
+        pallet.lots.forEach(otherLot => {
+          if (otherLot.id !== lot.id && otherLot.quantity > 0) {
+            const otherLotDate = new Date(otherLot.expirationDate);
+            if (otherLotDate < currentLotDate) {
+              samePalletOlderLots.push({
+                pallet: pallet,
+                lot: otherLot
+              });
+            }
+          }
+        });
+        
+        // If we found older lots within same pallet, no need to check other pallets
+        if (samePalletOlderLots.length > 0) {
+          setFifoCheck({
+            hasOlderLots: true,
+            olderLots: samePalletOlderLots
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        // If no older lots in same pallet, check other pallets
         const response = await apiRequest("GET", `/api/pallets/older-lots/${pallet.rmNumber}?excludePalletId=${pallet.palletId}`);
         const data = await response.json();
         console.log("FIFO check data:", data);
         
         // Filter lots that expire before the current lot (FEFO - First Expired, First Out)
         if (data.olderLots && data.olderLots.length > 0) {
-          const currentLotDate = new Date(lot.expirationDate);
-          
           // Filter only lots that expire before the current lot
           const earlierExpiringLots = data.olderLots.filter((item: {pallet: Pallet, lot: Lot}) => {
             const itemExpDate = new Date(item.lot.expirationDate);
@@ -64,7 +90,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
     };
     
     fetchFifoCheck();
-  }, [pallet.rmNumber, pallet.palletId, lot.expirationDate]);
+  }, [pallet.rmNumber, pallet.palletId, lot.expirationDate, pallet.lots]);
   
   const pickMutation = useMutation({
     mutationFn: async () => {
@@ -129,7 +155,12 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                   <div>
                     <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
                     <AlertDescription className="text-red-700 font-semibold">
-                      <p className="mb-2 text-base">Lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> with earlier expiration dates exist. Follow FEFO (First Expired, First Out):</p>
+                      <p className="mb-2 text-base">
+                        {fifoCheck.olderLots[0]?.pallet.id === pallet.id 
+                          ? "There are other lots in this pallet" 
+                          : "Lots of RM# " + pallet.rmNumber
+                        } with earlier expiration dates exist. Follow FEFO (First Expired, First Out):
+                      </p>
                       <ul className="list-disc ml-5 space-y-1">
                         {fifoCheck.olderLots.slice(0, 3).map((item, index) => (
                           <li key={index} className="font-bold">
