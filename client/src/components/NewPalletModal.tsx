@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, QrCode, RefreshCw } from "lucide-react";
 import ScannerModal from "./ScannerModal";
-import { convertWeight, formatWeightWithUnit } from "@/lib/formatUtils";
+import { convertWeight, formatWeightWithUnit, formatWeightForDisplay } from "@/lib/formatUtils";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 
 interface NewPalletModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanningForField, setScanningForField] = useState<{ index: number, field: 'lotNumber' | 'rmNumber' } | null>(null);
   const { toast } = useToast();
+  const { preferredUnit, autoConvert } = useUnitSettings();
   
   // Fetch new pallet ID
   type PalletIdResponse = { palletId: string };
@@ -80,7 +82,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
     const newLot: LotFormValues = {
       lotNumber: '',
       quantity: 0,
-      unit: 'KGS',
+      unit: preferredUnit, // Use the user's preferred unit
       expirationDate: new Date().toISOString().split('T')[0],
     };
     setLots([...lots, newLot]);
@@ -151,7 +153,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
       setLots([{
         lotNumber: '',
         quantity: 0,
-        unit: 'KGS',
+        unit: preferredUnit,
         expirationDate: new Date().toISOString().split('T')[0],
       }]);
       setActiveTab("pallet-info");
