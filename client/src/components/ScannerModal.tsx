@@ -43,20 +43,15 @@ export default function ScannerModal({
     const screenWidth = window.innerWidth || window.screen.width;
     const screenHeight = window.innerHeight || window.screen.height;
     
-    // TC70/Datawedge detection (handheld scanners)
-    const isLikelyDatawedgeDevice = 
+    // TC70/Datawedge detection - ONLY use specific model detection
+    // Do not use dimensions as this can misidentify tablets
+    const isTC70Device = 
       userAgent.includes("Android") && 
       (userAgent.includes("TC") || 
-      userAgent.includes("MC") || 
-      userAgent.includes("ET"));
+       userAgent.includes("MC") || 
+       userAgent.includes("ET"));
     
-    // TC70 dimensions heuristic
-    const hasTC70Dimensions = 
-      screenWidth <= 800 && 
-      screenHeight <= 800 &&
-      screenWidth >= 400;
-    
-    // Check for tablet
+    // Check for tablet - broader detection
     const isTabletDevice = 
       /iPad/.test(userAgent) || 
       (/Android/.test(userAgent) && !/Mobile/.test(userAgent)) ||
@@ -69,12 +64,18 @@ export default function ScannerModal({
     // Check for camera support
     const supportsCameraAPI = 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices;
     
-    // Determine if device is TC70
-    const isTC70Device = isLikelyDatawedgeDevice || hasTC70Dimensions;
+    console.log("Device detection updated:", {
+      userAgent,
+      dimensions: { width: screenWidth, height: screenHeight },
+      isTC70: isTC70Device,
+      isTablet: isTabletDevice,
+      isMobile: isMobileDevice,
+      supportsCamera: supportsCameraAPI
+    });
     
     // Save device info
     setDeviceInfo({
-      isTC70: isTC70Device,
+      isTC70: isTC70Device, // Only use model number detection, not dimensions
       isTablet: isTabletDevice,
       isMobile: isMobileDevice,
       supportsCamera: supportsCameraAPI

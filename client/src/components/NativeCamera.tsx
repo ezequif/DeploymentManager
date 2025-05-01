@@ -74,7 +74,8 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         const backCamera = availableCameras.find(camera => 
           camera.label && 
           (camera.label.toLowerCase().includes('back') || 
-           camera.label.toLowerCase().includes('environment')));
+           camera.label.toLowerCase().includes('environment') ||
+           camera.label.toLowerCase().includes('rear')));
            
         if (backCamera) {
           deviceId = backCamera.deviceId;
@@ -85,6 +86,14 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
           console.log("Selected camera by index:", availableCameras[currentCameraIndex].label || "Unnamed camera");
         }
       }
+      
+      // Log device detection for verification
+      console.log("Native camera starting on device:", {
+        isTC70: navigator.userAgent.includes("TC") || navigator.userAgent.includes("MC"),
+        userAgent: navigator.userAgent,
+        availableCameras: availableCameras.length,
+        selectedCamera: deviceId ? "Custom camera selected" : "Using environment facing default"
+      });
       
       // Make sure video element exists
       const videoElement = videoRef.current;

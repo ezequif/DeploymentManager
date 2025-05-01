@@ -59,20 +59,15 @@ export function ScannerProvider({ children }: { children: ReactNode }) {
     const screenWidth = window.innerWidth || window.screen.width;
     const screenHeight = window.innerHeight || window.screen.height;
     
-    // TC70/Datawedge detection (handheld scanners)
-    const isLikelyDatawedgeDevice = 
+    // TC70/Datawedge detection - ONLY use explicit model detection
+    // Do not use dimensions as they can misidentify tablets as TC70 devices
+    const isTC70Device = 
       userAgent.includes("Android") && 
       (userAgent.includes("TC") || 
        userAgent.includes("MC") || 
        userAgent.includes("ET"));
     
-    // TC70 dimensions heuristic
-    const hasTC70Dimensions = 
-      screenWidth <= 800 && 
-      screenHeight <= 800 &&
-      screenWidth >= 400;
-    
-    // Check for tablet
+    // Check for tablet - broader detection
     const isTabletDevice = 
       /iPad/.test(userAgent) || 
       (/Android/.test(userAgent) && !/Mobile/.test(userAgent)) ||
@@ -85,12 +80,9 @@ export function ScannerProvider({ children }: { children: ReactNode }) {
     // Check for camera support
     const supportsCamera = 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices;
     
-    // Determine if device is TC70
-    const isTC70Device = isLikelyDatawedgeDevice || hasTC70Dimensions;
-    
     // Set device info
     setDeviceInfo({
-      isTC70: isTC70Device,
+      isTC70: isTC70Device, // Only use model detection, not dimensions
       isTablet: isTabletDevice,
       isMobile: isMobileDevice,
       supportsCamera: supportsCamera
@@ -108,13 +100,14 @@ export function ScannerProvider({ children }: { children: ReactNode }) {
     }
     
     // Log device detection info
-    console.log("Device detection:", {
+    console.log("Device detection (updated method):", {
       userAgent,
       dimensions: { width: screenWidth, height: screenHeight },
       isTC70: isTC70Device,
       isTablet: isTabletDevice,
       isMobile: isMobileDevice,
-      supportsCamera
+      supportsCamera,
+      message: "Using updated detection method: We now only detect TC70 from specific model numbers in user agent, not from screen dimensions"
     });
   };
   
