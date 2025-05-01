@@ -14,7 +14,7 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
   const [manualCode, setManualCode] = useState("");
   const { toast } = useToast();
 
@@ -131,37 +131,95 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
       });
       
       // Add debug info to show processed images
-      Quagga.onProcessed((result) => {
+      Quagga.onProcessed((result: any) => {
+        // Safety check for Quagga canvas
+        if (!result || !Quagga.canvas || !Quagga.canvas.ctx || !Quagga.canvas.dom) {
+          return;
+        }
+        
         const drawingCtx = Quagga.canvas.ctx.overlay;
         const drawingCanvas = Quagga.canvas.dom.overlay;
         
-        if (result) {
-          if (result.boxes) {
-            drawingCtx.clearRect(
-              0, 0, parseInt(drawingCanvas.getAttribute("width") || "0"), 
-              parseInt(drawingCanvas.getAttribute("height") || "0")
-            );
-            result.boxes.filter(box => box !== result.box).forEach(box => {
-              drawingCtx.strokeStyle = "green";
-              drawingCtx.lineWidth = 2;
-              drawingCtx.strokeRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+        if (!drawingCtx || !drawingCanvas) {
+          return;
+        }
+        
+        // Get canvas dimensions
+        const width = parseInt(drawingCanvas.getAttribute("width") || "0");
+        const height = parseInt(drawingCanvas.getAttribute("height") || "0");
+        
+        // Clear the canvas
+        drawingCtx.clearRect(0, 0, width, height);
+        
+        try {
+          // Draw potential barcode boxes (green)
+          if (result.boxes && Array.isArray(result.boxes)) {
+            // Use any to bypass TypeScript strictness for Quagga types
+            (result.boxes as any[]).forEach((box: any) => {
+              if (Array.isArray(box) && box.length >= 4) {
+                drawingCtx.strokeStyle = "rgba(0, 255, 0, 0.5)";
+                drawingCtx.lineWidth = 2;
+                
+                // Draw the box using coordinates
+                try {
+                  const x = Number(box[0]);
+                  const y = Number(box[1]);
+                  const w = Number(box[2]) - Number(box[0]);
+                  const h = Number(box[3]) - Number(box[1]);
+                  
+                  if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h)) {
+                    drawingCtx.strokeRect(x, y, w, h);
+                  }
+                } catch (e) {
+                  // Ignore drawing errors
+                }
+              }
             });
           }
           
+          // Draw the found barcode box (blue)
           if (result.box) {
-            drawingCtx.strokeStyle = "blue";
-            drawingCtx.lineWidth = 2;
-            drawingCtx.strokeRect(
-              result.box.x, result.box.y, 
-              result.box.width, result.box.height
-            );
+            drawingCtx.strokeStyle = "rgba(0, 0, 255, 0.8)";
+            drawingCtx.lineWidth = 3;
+            
+            // Try to handle all possible formats of result.box
+            if (Array.isArray(result.box)) {
+              try {
+                const x = Number(result.box[0]);
+                const y = Number(result.box[1]);
+                const w = Number(result.box[2]) - Number(result.box[0]);
+                const h = Number(result.box[3]) - Number(result.box[1]);
+                
+                if (!isNaN(x) && !isNaN(y) && !isNaN(w) && !isNaN(h)) {
+                  drawingCtx.strokeRect(x, y, w, h);
+                }
+              } catch (e) {
+                // Ignore drawing errors
+              }
+            } else {
+              // Handle object format if present
+              try {
+                const box = result.box as any;
+                if (box.x !== undefined && box.y !== undefined && 
+                    box.width !== undefined && box.height !== undefined) {
+                  
+                  drawingCtx.strokeRect(box.x, box.y, box.width, box.height);
+                }
+              } catch (e) {
+                // Ignore drawing errors
+              }
+            }
           }
           
+          // Display the found code
           if (result.codeResult && result.codeResult.code) {
-            drawingCtx.font = "24px Arial";
-            drawingCtx.fillStyle = "green";
-            drawingCtx.fillText(result.codeResult.code, 10, 50);
+            drawingCtx.font = "18px Arial";
+            drawingCtx.fillStyle = "rgba(0, 255, 0, 0.8)";
+            drawingCtx.fillText(String(result.codeResult.code), 10, 25);
           }
+        } catch (e) {
+          // Catch any unexpected errors in drawing code
+          console.error("Error in Quagga drawing:", e);
         }
       });
       
@@ -223,13 +281,13 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
         </div>
         
         {/* Error message overlay */}
-        {error && (
+        {error && error.length > 0 && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4">
             <div className="bg-white p-4 rounded-lg max-w-xs">
               <h3 className="font-medium text-red-500 mb-2">Scanner Error</h3>
               <p className="text-sm">{error}</p>
               <Button
-                onClick={() => setError(null)}
+                onClick={() => setError("")}
                 className="mt-2 w-full"
                 variant="outline"
                 size="sm"

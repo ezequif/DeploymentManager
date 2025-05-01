@@ -15,7 +15,7 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
   const [manualCode, setManualCode] = useState("");
   const { toast } = useToast();
 
@@ -48,7 +48,11 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
     try {
       // Stop any existing stream and Quagga instance
       stopCamera();
-      Quagga.stop();
+      try {
+        Quagga.stop();
+      } catch (e) {
+        // Ignore errors on stop
+      }
       
       // Get list of cameras first
       await getCameras();
@@ -119,7 +123,7 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
               : new MediaStream([track]);
               
             setCameraStream(stream);
-            setError(null);
+            setError("");
             
             toast({
               title: "Scanner Ready",
@@ -258,8 +262,9 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         },
         locate: true
       }, function(result) {
-        if (result && result.codeResult) {
-          console.log("Barcode detected in image:", result.codeResult.code);
+        if (result && result.codeResult && result.codeResult.code) {
+          const code = result.codeResult.code;
+          console.log("Barcode detected in image:", code);
           
           // Signal successful scan
           if (navigator.vibrate) {
@@ -268,11 +273,11 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
           
           toast({
             title: "Barcode Found!",
-            description: result.codeResult.code
+            description: code
           });
           
           // Return the detected barcode
-          onCapture(result.codeResult.code);
+          onCapture(code);
         } else {
           console.log("No barcode detected in image");
           toast({
@@ -330,11 +335,19 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         </div>
         
         {/* Error overlay */}
-        {error && (
+        {error && error.length > 0 && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4">
             <div className="bg-white p-4 rounded-lg max-w-xs">
               <h3 className="font-medium text-red-500 mb-2">Camera Error</h3>
               <p className="text-sm">{error}</p>
+              <Button
+                onClick={() => setError("")}
+                className="mt-2 w-full"
+                variant="outline" 
+                size="sm"
+              >
+                Dismiss
+              </Button>
             </div>
           </div>
         )}
