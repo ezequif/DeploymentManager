@@ -166,7 +166,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cleanup connection attempts map periodically to prevent memory leaks
   const cleanupConnectionsInterval = setInterval(() => {
     const now = Date.now();
-    for (const [ip, data] of connectionAttempts.entries()) {
+    // Convert to array for compatibility with older TypeScript
+    const entries = Array.from(connectionAttempts.entries());
+    
+    // Process each entry
+    for (let i = 0; i < entries.length; i++) {
+      const [ip, data] = entries[i];
       // Remove entries older than 5 minutes
       if (now - data.lastAttempt > 5 * 60 * 1000) {
         connectionAttempts.delete(ip);
@@ -178,11 +183,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // WebSocket connection with enhanced security
   wss.on('connection', (ws, req) => {
-    // Extract client information early for logging
+    // Get client information for security checks and logging
     const ipAddress = req.headers['x-forwarded-for'] || 
                     req.socket.remoteAddress || 
                     'unknown';
-    const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
+    const clientIp = typeof ipAddress === 'string' ? ipAddress : Array.isArray(ipAddress) ? ipAddress[0] : 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
     
     // Basic rate limiting
     const ipData = connectionAttempts.get(clientIp) || { count: 0, lastAttempt: 0 };
@@ -224,8 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     (ws as any).isAlive = true;
     
-    // Get additional client information
-    const userAgent = req.headers['user-agent'] || 'unknown';
+    // We've already captured userAgent above
     
     // Create a unique client ID with more entropy
     const generateSecureClientId = () => {
