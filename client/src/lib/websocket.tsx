@@ -80,7 +80,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       console.log('Cannot sync via WebSocket - using REST API fallback');
       
       // Try to reload data via REST API as a fallback - silently
-      const apiUrl = `${window.location.origin}/api/pallets`;
+      // Construct URL that works in both preview and deployed environments
+      let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
+          
+      // If we're in a Replit preview and location origin doesn't include the proper base path
+      if (window.location.hostname.includes('replit.dev') && 
+          window.location.pathname !== '/' && 
+          !window.location.pathname.startsWith('/api')) {
+        // For Replit preview, use the full origin plus the relative path
+        // Get the base directory path from the current location
+        const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
+        if (basePath) {
+          apiUrl = `${window.location.origin}${basePath}/api/pallets`;
+        } else {
+          apiUrl = `${window.location.origin}/api/pallets`;
+        }
+      }
+          
       console.log(`Fetching from: ${apiUrl}`);
       
       fetch(apiUrl, {
@@ -135,8 +151,22 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       const pollData = (retryAttempt = 0) => {
         console.log(`Polling data for TC70 (attempt: ${retryAttempt})`);
         
-        // Use a full absolute URL to avoid any path resolution issues
-        const apiUrl = `${window.location.origin}/api/pallets`;
+        // Construct URL that works in both preview and deployed environments
+        let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
+        
+        // If we're in a Replit preview environment
+        if (window.location.hostname.includes('replit.dev') && 
+            window.location.pathname !== '/' && 
+            !window.location.pathname.startsWith('/api')) {
+          // For Replit preview, use full paths with basePath
+          const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
+          if (basePath) {
+            apiUrl = `${window.location.origin}${basePath}/api/pallets`;
+          } else {
+            apiUrl = `${window.location.origin}/api/pallets`;
+          }
+        }
+        
         console.log(`Fetching from: ${apiUrl}`);
         
         fetch(apiUrl, {
@@ -201,8 +231,22 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         const pollData = (retryAttempt = 0) => {
           console.log(`Polling data (WebSocket fallback) (attempt: ${retryAttempt})`);
           
-          // Use a full absolute URL to avoid any path resolution issues
-          const apiUrl = `${window.location.origin}/api/pallets`;
+          // Construct URL that works in both preview and deployed environments
+          let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
+          
+          // If we're in a Replit preview and location origin doesn't include the proper base path
+          if (window.location.hostname.includes('replit.dev') && 
+              window.location.pathname !== '/' && 
+              !window.location.pathname.startsWith('/api')) {
+            // For Replit preview, use full paths with basePath
+            const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
+            if (basePath) {
+              apiUrl = `${window.location.origin}${basePath}/api/pallets`;
+            } else {
+              apiUrl = `${window.location.origin}/api/pallets`;
+            }
+          }
+          
           console.log(`Fetching from: ${apiUrl}`);
           
           fetch(apiUrl, {
@@ -267,8 +311,31 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         return returnObj;
       }
       
+      // Determine appropriate WebSocket URL based on environment
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      // Base WebSocket URL
+      let wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      // Check if we're in a Replit preview environment 
+      // Preview URLs typically have long complex paths that need special handling
+      if (window.location.hostname.includes('replit.dev')) {
+        // Log the current URL for debugging
+        console.log('Preview environment detected, adjusting WebSocket URL');
+        console.log('Current location:', window.location.href);
+        
+        // For preview, handle potential path prefixing
+        if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/ws')) {
+          // Try to handle the preview environment where front-end paths might be different
+          const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
+          if (basePath) {
+            wsUrl = `${protocol}//${window.location.host}${basePath}/ws`;
+            console.log('Adjusted WebSocket URL for preview:', wsUrl);
+          }
+        }
+      }
+      
+      console.log('Connecting to WebSocket at:', wsUrl);
       
       // Calculate the delay based on retry count, with a maximum of 10 seconds
       // For low-power devices, use a longer backoff to conserve battery
