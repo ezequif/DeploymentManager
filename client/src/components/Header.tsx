@@ -20,12 +20,12 @@ export default function Header() {
   
   return (
     <header className="bg-primary text-white shadow-md">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <Package className="h-7 w-7" />
-          <h1 className="text-xl font-bold">Warehouse Pallet System</h1>
+      <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 flex justify-between items-center">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <Package className="h-6 w-6 sm:h-7 sm:w-7" />
+          <h1 className="text-base sm:text-xl font-bold truncate">Warehouse Pallet System</h1>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-1 sm:space-x-3">
           {/* Sync Data Button */}
           <TooltipProvider>
             <Tooltip>
@@ -33,14 +33,14 @@ export default function Header() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-primary-foreground/20"
+                  className="text-white hover:bg-primary-foreground/20 px-2 h-8 sm:px-3"
                   onClick={handleSyncClick}
                   disabled={!connected}
                 >
                   <RefreshCw 
-                    className={`h-5 w-5 mr-1 ${isSyncing ? 'animate-spin' : ''}`} 
+                    className={`h-4 w-4 sm:h-5 sm:w-5 ${isSyncing ? 'animate-spin' : ''}`} 
                   />
-                  <span className="text-sm">Sync</span>
+                  <span className="text-xs sm:text-sm sr-only sm:not-sr-only sm:ml-1">Sync</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -57,11 +57,11 @@ export default function Header() {
             <Button 
               variant="secondary" 
               size="sm"
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-blue-600 text-white hover:bg-blue-700 text-xs sm:text-sm px-2 h-8 sm:px-3"
               onClick={() => setShowClientsModal(true)}
             >
-              <Users className="h-4 w-4 mr-1" />
-              <span>View {userCount} Connections</span>
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline">View</span> {userCount} <span className="hidden sm:inline">Connections</span>
             </Button>
           )}
           
@@ -73,12 +73,12 @@ export default function Header() {
                   onClick={() => userCount > 1 && setShowClientsModal(true)}
                 >
                   {connected ? (
-                    <SignalHigh className="h-6 w-6 text-green-400" />
+                    <SignalHigh className="h-5 w-5 sm:h-6 sm:w-6 text-green-400" />
                   ) : (
-                    <SignalLow className="h-6 w-6 text-red-400" />
+                    <SignalLow className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
                   )}
                   {userCount > 1 && (
-                    <span className="ml-1 text-sm font-medium bg-primary-foreground text-primary px-1.5 py-0.5 rounded-full">
+                    <span className="ml-1 text-xs sm:text-sm font-medium bg-primary-foreground text-primary px-1 sm:px-1.5 py-0.5 rounded-full">
                       {userCount}
                     </span>
                   )}

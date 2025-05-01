@@ -34,11 +34,11 @@ export default function Settings() {
   return (
     <div className="mt-6 space-y-6">
       <Tabs defaultValue="preferences" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="import">Data Import</TabsTrigger>
-          <TabsTrigger value="export">Data Export</TabsTrigger>
-          <TabsTrigger value="about">About</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 h-auto">
+          <TabsTrigger value="preferences" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Preferences</TabsTrigger>
+          <TabsTrigger value="import" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Data Import</TabsTrigger>
+          <TabsTrigger value="export" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Data Export</TabsTrigger>
+          <TabsTrigger value="about" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">About</TabsTrigger>
         </TabsList>
         
         <TabsContent value="preferences" className="mt-4">
