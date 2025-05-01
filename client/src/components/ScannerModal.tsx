@@ -79,14 +79,12 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     // Regular browser flow
     if (!manualEntry) {
       try {
-        // First request camera permission with relaxed constraints for better tablet compatibility
+        // For tablets with compatibility issues, use absolute minimal constraints
+        // This increases chance of working on any device, even if the video quality is lower
         navigator.mediaDevices.getUserMedia({ 
           video: { 
-            width: { ideal: 640, min: 320 },
-            height: { ideal: 480, min: 240 },
-            facingMode: "environment",
-            // Relax aspect ratio constraint entirely
-            aspectRatio: { min: 0.5, max: 2.5 }
+            // Only specify facingMode for maximum compatibility
+            facingMode: "environment"
           } 
         })
           .then(stream => {
@@ -233,21 +231,29 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         console.log("Initializing Quagga2 scanner with device ID:", deviceId);
         
         // Configure scanner with optimal settings for barcode scanning
+        // For tablet compatibility, first check if device is a tablet or mobile
+        const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+        
         Quagga.init({
           inputStream: {
             name: "Live",
             type: "LiveStream",
             target: scannerRef.current,
-            constraints: {
-              // Much more relaxed constraints for wider device compatibility
-              width: { min: 320, ideal: 720, max: 1920 },
-              height: { min: 240, ideal: 540, max: 1080 },
-              // Relaxed aspect ratio constraints for tablets
-              aspectRatio: { min: 0.5, max: 2 },
-              facingMode: "environment",
-              // Only use deviceId if it's provided and not empty
-              ...(deviceId ? { deviceId } : {})
-            },
+            // Special handling for tablets - they often need different settings
+            constraints: isTablet 
+              ? { 
+                  // Tablet devices need absolute minimal constraints
+                  facingMode: "environment",
+                  // Only use deviceId if explicitly provided
+                  ...(deviceId ? { deviceId } : {})
+                } 
+              : {
+                  // For phones, we can use slightly better constraints
+                  width: { min: 320, ideal: 640, max: 1280 },
+                  height: { min: 240, ideal: 480, max: 720 },
+                  facingMode: "environment",
+                  ...(deviceId ? { deviceId } : {})
+                },
             willReadFrequently: true,
             area: { // Only scan the center 80% of the viewport
               top: "10%",
@@ -303,7 +309,8 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
                 (err.message && err.message.includes("constraint"))) {
               errorMsg = "Your tablet's camera doesn't support the requested settings. Trying alternative settings...";
               
-              // For constraint errors, try again with minimal constraints
+              // For constraint errors on tablets, try again with absolutely no constraints
+              // This allows the browser to pick what it thinks is best
               setTimeout(() => {
                 if (scannerRef.current) {
                   Quagga.init({
@@ -312,13 +319,14 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
                       type: "LiveStream",
                       target: scannerRef.current,
                       constraints: {
-                        // Absolute minimal constraints
-                        facingMode: "environment"
+                        // Completely unconstrained - let the device decide what works
+                        video: true
                       },
                       willReadFrequently: true
                     },
                     decoder: {
-                      readers: ["code_128_reader", "ean_reader", "code_39_reader"]
+                      // Keep only the most reliable readers for performance on tablets
+                      readers: ["code_128_reader", "ean_reader"]
                     },
                     locate: true
                   }, function(err2) {
