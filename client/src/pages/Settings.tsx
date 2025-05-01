@@ -41,17 +41,17 @@ export default function Settings() {
           <TabsTrigger value="about" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">About</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="preferences" className="mt-4">
+        <TabsContent value="preferences" className="mt-2 sm:mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
+            <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+              <CardTitle className="text-base sm:text-lg">System Settings</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4">
+            <CardContent className="px-3 sm:px-6 space-y-3 sm:space-y-4">
+              <div className="grid gap-3 sm:gap-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="barcode-scanner" className="font-medium">Barcode Scanner</Label>
-                    <p className="text-sm text-gray-500">Enable barcode scanning functionality</p>
+                  <div className="pr-2">
+                    <Label htmlFor="barcode-scanner" className="text-sm sm:text-base font-medium">Barcode Scanner</Label>
+                    <p className="text-xs sm:text-sm text-gray-500">Enable barcode scanning functionality</p>
                   </div>
                   <Switch 
                     id="barcode-scanner" 
@@ -60,8 +60,8 @@ export default function Settings() {
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="default-unit" className="font-medium">Preferred Weight Unit</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="default-unit" className="text-sm sm:text-base font-medium">Preferred Weight Unit</Label>
                   <Select
                     value={preferredUnit}
                     onValueChange={(value) => {
@@ -73,7 +73,7 @@ export default function Settings() {
                       });
                     }}
                   >
-                    <SelectTrigger id="default-unit">
+                    <SelectTrigger id="default-unit" className="h-8 sm:h-10 text-xs sm:text-sm">
                       <SelectValue placeholder="Select unit" />
                     </SelectTrigger>
                     <SelectContent>
@@ -85,9 +85,9 @@ export default function Settings() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="auto-convert-units" className="font-medium">Auto-Convert Units</Label>
-                    <p className="text-sm text-gray-500">Automatically convert between KGS and LBS when entering or displaying quantities</p>
+                  <div className="pr-2">
+                    <Label htmlFor="auto-convert-units" className="text-sm sm:text-base font-medium">Auto-Convert Units</Label>
+                    <p className="text-xs sm:text-sm text-gray-500">Automatically convert between KGS and LBS</p>
                   </div>
                   <Switch 
                     id="auto-convert-units" 
@@ -105,13 +105,13 @@ export default function Settings() {
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="expiration-warning" className="font-medium">Expiration Warning</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="expiration-warning" className="text-sm sm:text-base font-medium">Expiration Warning</Label>
                   <Select
                     value={settings.expirationWarningDays.toString()}
                     onValueChange={(value) => setSettings({...settings, expirationWarningDays: parseInt(value)})}
                   >
-                    <SelectTrigger id="expiration-warning">
+                    <SelectTrigger id="expiration-warning" className="h-8 sm:h-10 text-xs sm:text-sm">
                       <SelectValue placeholder="Days before expiration" />
                     </SelectTrigger>
                     <SelectContent>
@@ -126,9 +126,9 @@ export default function Settings() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="print-automatically" className="font-medium">Print Automatically</Label>
-                    <p className="text-sm text-gray-500">Automatically print label when creating new pallet</p>
+                  <div className="pr-2">
+                    <Label htmlFor="print-automatically" className="text-sm sm:text-base font-medium">Print Automatically</Label>
+                    <p className="text-xs sm:text-sm text-gray-500">Auto-print label for new pallets</p>
                   </div>
                   <Switch 
                     id="print-automatically" 
@@ -138,9 +138,9 @@ export default function Settings() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="enable-sounds" className="font-medium">Enable Sounds</Label>
-                    <p className="text-sm text-gray-500">Play sounds for scanner and operations</p>
+                  <div className="pr-2">
+                    <Label htmlFor="enable-sounds" className="text-sm sm:text-base font-medium">Enable Sounds</Label>
+                    <p className="text-xs sm:text-sm text-gray-500">Play sounds for scanner operations</p>
                   </div>
                   <Switch 
                     id="enable-sounds" 
@@ -150,45 +150,50 @@ export default function Settings() {
                 </div>
               </div>
               
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveSettings}>Save Settings</Button>
+              <div className="flex justify-end mt-4 sm:mt-6">
+                <Button 
+                  onClick={handleSaveSettings}
+                  className="text-xs sm:text-sm h-8 sm:h-10 px-3 sm:px-4"
+                >
+                  Save Settings
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="import" className="mt-4">
+        <TabsContent value="import" className="mt-2 sm:mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Data Import</CardTitle>
+            <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+              <CardTitle className="text-base sm:text-lg">Data Import</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
               <ImportCSV />
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="export" className="mt-4">
+        <TabsContent value="export" className="mt-2 sm:mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Data Export</CardTitle>
+            <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+              <CardTitle className="text-base sm:text-lg">Data Export</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
               <ExportCSV />
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="about" className="mt-4">
+        <TabsContent value="about" className="mt-2 sm:mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>About</CardTitle>
+            <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+              <CardTitle className="text-base sm:text-lg">About</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6">
               <div className="space-y-2">
-                <p className="text-sm">Warehouse Pallet System v1.0.0</p>
-                <p className="text-sm text-gray-500">© 2023 Warehouse Systems Inc.</p>
-                <p className="text-sm mt-4">
+                <p className="text-xs sm:text-sm">Warehouse Pallet System v1.0.0</p>
+                <p className="text-xs sm:text-sm text-gray-500">© 2023 Warehouse Systems Inc.</p>
+                <p className="text-xs sm:text-sm mt-4">
                   This warehouse inventory management system is designed for tracking pallets, lots, and material movements.
                 </p>
               </div>

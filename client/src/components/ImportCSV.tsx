@@ -163,28 +163,28 @@ export function ImportCSV() {
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {result && (
         <Alert variant={result.success > 0 ? "default" : "destructive"}>
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2 sm:gap-3">
             {result.success > 0 ? (
-              <Check className="h-5 w-5" />
+              <Check className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" />
             ) : (
-              <FileWarning className="h-5 w-5" />
+              <FileWarning className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" />
             )}
-            <div className="space-y-1">
-              <AlertTitle>
+            <div className="space-y-0.5 sm:space-y-1">
+              <AlertTitle className="text-sm sm:text-base">
                 {result.success > 0 
                   ? `Import Successful: ${result.success} records imported` 
                   : 'Import Failed'}
               </AlertTitle>
-              <AlertDescription className="text-sm">
+              <AlertDescription className="text-xs sm:text-sm">
                 {result.message}
                 
                 {result.details && result.details.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    <p className="font-medium">Details:</p>
-                    <ul className="list-disc list-inside text-xs space-y-1">
+                  <div className="mt-1 sm:mt-2 space-y-0.5 sm:space-y-1">
+                    <p className="font-medium text-xs sm:text-sm">Details:</p>
+                    <ul className="list-disc list-inside text-xs space-y-0.5 sm:space-y-1">
                       {result.details.map((detail, index) => (
                         <li key={index}>{detail}</li>
                       ))}
@@ -195,11 +195,12 @@ export function ImportCSV() {
             </div>
           </div>
           
-          <div className="mt-3">
+          <div className="mt-2 sm:mt-3">
             <Button 
               variant="outline" 
               size="sm"
               onClick={resetState}
+              className="text-xs sm:text-sm h-8 px-3"
             >
               Reset
             </Button>
@@ -207,47 +208,47 @@ export function ImportCSV() {
         </Alert>
       )}
       
-      <div className="border rounded-lg p-5">
-        <div className="flex flex-col space-y-4">
-          <h3 className="text-lg font-medium">Import Data</h3>
+      <div className="border rounded-lg p-3 sm:p-5">
+        <div className="flex flex-col space-y-3 sm:space-y-4">
+          <h3 className="text-base sm:text-lg font-medium">Import Data</h3>
           
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>Choose the right import format</AlertTitle>
-            <AlertDescription className="text-sm">
+          <Alert className="py-2 sm:py-4">
+            <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <AlertTitle className="text-sm sm:text-base">Choose the right import format</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
               Download the appropriate template for your data type. For existing inventory in racks, 
               use the "Existing Inventory" template that includes both pallet and lot information in one file.
             </AlertDescription>
           </Alert>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mt-2">
             <Button 
               variant="outline" 
               onClick={() => generateSampleCSV('pallets')}
-              className="flex gap-2 items-center"
+              className="flex gap-1 sm:gap-2 items-center text-xs sm:text-sm h-9 py-1 px-2 sm:h-10 sm:px-3"
             >
-              <FileText className="h-4 w-4" />
-              Pallets Template
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Pallets Template</span>
             </Button>
             <Button 
               variant="outline" 
               onClick={() => generateSampleCSV('lots')}
-              className="flex gap-2 items-center"
+              className="flex gap-1 sm:gap-2 items-center text-xs sm:text-sm h-9 py-1 px-2 sm:h-10 sm:px-3"
             >
-              <FileText className="h-4 w-4" />
-              Lots Template
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Lots Template</span>
             </Button>
             <Button 
               variant="outline" 
               onClick={() => generateSampleCSV('existing_inventory')}
-              className="flex gap-2 items-center text-primary"
+              className="flex gap-1 sm:gap-2 items-center text-xs sm:text-sm h-9 py-1 px-2 sm:h-10 sm:px-3 text-primary col-span-2 sm:col-span-1"
             >
-              <FileText className="h-4 w-4" />
-              Existing Inventory Template
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Existing Inventory</span>
             </Button>
           </div>
           
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <input 
               type="file" 
               accept=".csv" 
@@ -257,26 +258,29 @@ export function ImportCSV() {
               ref={fileInputRef}
               disabled={isUploading}
             />
-            <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
-              <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-              <p className="text-gray-600 font-medium mb-1">Click to upload CSV file</p>
-              <p className="text-gray-500 text-sm">or drag and drop</p>
+            <div 
+              className="border-2 border-dashed rounded-lg p-4 sm:p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer" 
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+            >
+              <Upload className="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-gray-400 mb-1 sm:mb-2" />
+              <p className="text-gray-600 text-sm sm:text-base font-medium mb-0.5 sm:mb-1">Click to upload CSV file</p>
+              <p className="text-gray-500 text-xs sm:text-sm">or drag and drop</p>
               
               {isUploading && (
-                <div className="mt-4">
-                  <Progress value={progress} className="h-2" />
-                  <p className="text-sm text-gray-500 mt-1">Uploading and processing...</p>
+                <div className="mt-3 sm:mt-4">
+                  <Progress value={progress} className="h-1.5 sm:h-2" />
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">Uploading and processing...</p>
                 </div>
               )}
             </div>
           </div>
           
-          <Alert className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Important</AlertTitle>
-            <AlertDescription className="text-sm">
-              <ul className="list-disc list-inside space-y-1">
-                <li>Make sure your CSV file has the correct headers matching the template</li>
+          <Alert className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200 py-2 sm:py-3">
+            <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 mt-0.5" />
+            <AlertTitle className="text-sm sm:text-base">Important</AlertTitle>
+            <AlertDescription className="text-xs sm:text-sm">
+              <ul className="list-disc list-inside space-y-0.5 sm:space-y-1">
+                <li>Make sure your CSV file has the correct headers</li>
                 <li>For existing inventory, one row per lot will be created</li>
                 <li>Duplicate pallet IDs will be skipped</li>
                 <li>Date format should be YYYY-MM-DD</li>
