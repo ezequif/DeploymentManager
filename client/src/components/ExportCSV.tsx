@@ -6,7 +6,20 @@ import Papa from 'papaparse';
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FileDown, Check, FileWarning, FileText } from "lucide-react";
-import { type PalletWithLots, type Lot, type PalletStatus } from "@shared/schema";
+import { type PalletWithLots, type Lot } from "@shared/schema";
+
+// Define utility functions to safely handle data for CSV export
+function assertStatus(value: any): string {
+  return value ? value.toString() : 'active';
+}
+
+function formatSafeDate(dateStr: string | Date): string {
+  try {
+    return new Date(dateStr).toISOString().split('T')[0];
+  } catch (e) {
+    return new Date().toISOString().split('T')[0]; // Fallback to today's date
+  }
+}
 
 // Function to format data for CSV export
 function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lots' | 'full_inventory'): any[] {
@@ -17,8 +30,8 @@ function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lo
         palletId: pallet.palletId,
         rmNumber: pallet.rmNumber,
         location: pallet.location,
-        status: pallet.status.toString(),
-        createdAt: new Date(pallet.createdAt).toISOString().split('T')[0],
+        status: assertStatus((pallet as any).status),
+        createdAt: formatSafeDate(pallet.createdAt),
       }));
     
     case 'lots':
@@ -29,8 +42,8 @@ function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lo
           lotNumber: lot.lotNumber,
           quantity: lot.quantity,
           unit: lot.unit,
-          expirationDate: new Date(lot.expirationDate).toISOString().split('T')[0],
-          createdAt: new Date(lot.createdAt).toISOString().split('T')[0],
+          expirationDate: formatSafeDate(lot.expirationDate),
+          createdAt: formatSafeDate(lot.createdAt),
         }))
       );
     
