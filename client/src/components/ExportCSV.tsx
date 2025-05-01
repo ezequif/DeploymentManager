@@ -57,7 +57,7 @@ function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lo
           lotNumber: lot.lotNumber,
           quantity: lot.quantity,
           unit: lot.unit,
-          expirationDate: new Date(lot.expirationDate).toISOString().split('T')[0],
+          expirationDate: formatSafeDate(lot.expirationDate),
         }))
       );
     
@@ -70,6 +70,7 @@ export function ExportCSV() {
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const { toast } = useToast();
   const { pallets } = useWebSocket();
   
@@ -78,6 +79,7 @@ export function ExportCSV() {
       setIsExporting(true);
       setProgress(10);
       setError(null);
+      setSuccess(null);
       
       if (!pallets || pallets.length === 0) {
         throw new Error('No data available to export');
@@ -125,6 +127,9 @@ export function ExportCSV() {
       
       setProgress(100);
       
+      // Set success message
+      setSuccess(`Successfully exported ${dataToExport.length} records to ${filename}`);
+      
       toast({
         title: 'Export Successful',
         description: `Exported ${dataToExport.length} records to ${filename}`,
@@ -145,6 +150,13 @@ export function ExportCSV() {
       setTimeout(() => {
         setIsExporting(false);
       }, 1000);
+      
+      // Auto-hide success message after 5 seconds
+      if (success) {
+        setTimeout(() => {
+          setSuccess(null);
+        }, 5000);
+      }
     }
   };
   
@@ -157,6 +169,18 @@ export function ExportCSV() {
             <div className="space-y-1">
               <AlertTitle>Export Failed</AlertTitle>
               <AlertDescription className="text-sm">{error}</AlertDescription>
+            </div>
+          </div>
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert variant="default" className="bg-green-50 border-green-300">
+          <div className="flex items-start gap-3">
+            <Check className="h-5 w-5 text-green-500" />
+            <div className="space-y-1">
+              <AlertTitle>Export Successful</AlertTitle>
+              <AlertDescription className="text-sm">{success}</AlertDescription>
             </div>
           </div>
         </Alert>
