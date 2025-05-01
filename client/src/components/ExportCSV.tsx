@@ -6,7 +6,7 @@ import Papa from 'papaparse';
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FileDown, Check, FileWarning, FileText } from "lucide-react";
-import { type PalletWithLots, type Lot } from "@shared/schema";
+import { type PalletWithLots, type Lot, type PalletStatus } from "@shared/schema";
 
 // Function to format data for CSV export
 function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lots' | 'full_inventory'): any[] {
@@ -17,7 +17,7 @@ function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lo
         palletId: pallet.palletId,
         rmNumber: pallet.rmNumber,
         location: pallet.location,
-        notes: pallet.notes || '',
+        status: pallet.status,
         createdAt: new Date(pallet.createdAt).toISOString().split('T')[0],
       }));
     
