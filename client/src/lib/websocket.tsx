@@ -60,47 +60,22 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const syncData = useCallback(() => {
     let canUseWebSocket = false;
     
-    // In preview environment, always use REST API fallback for reliability
-    const isPreviewEnv = window.location.hostname.includes('replit.dev');
-    
-    // Check if we have a valid WebSocket connection and it's not a preview environment
-    if (!isPreviewEnv && socket && 'readyState' in socket && 'send' in socket) {
+    // Check if we have a valid WebSocket connection
+    if (socket && 'readyState' in socket && 'send' in socket) {
       const ws = socket as WebSocket;
       if (ws.readyState === WebSocket.OPEN) {
-        try {
-          // Silent sync - Tell the server to send us a full data refresh without toast notifications
-          ws.send(JSON.stringify({ type: 'requestSync' }));
-          canUseWebSocket = true;
-        } catch (e) {
-          console.error("Failed to send sync request via WebSocket:", e);
-          canUseWebSocket = false;
-        }
+        // Silent sync - Tell the server to send us a full data refresh without toast notifications
+        ws.send(JSON.stringify({ type: 'requestSync' }));
+        canUseWebSocket = true;
       }
     }
     
-    // If we couldn't use WebSocket or we're in preview, fall back to REST API
+    // If we couldn't use WebSocket, fall back to REST API
     if (!canUseWebSocket) {
-      console.log('Using REST API fallback for data sync');
+      console.log('Cannot sync via WebSocket - using REST API fallback');
       
       // Try to reload data via REST API as a fallback - silently
-      // Construct URL that works in both preview and deployed environments
-      let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
-          
-      // In preview environment, always use a full URL for maximum reliability
-      if (isPreviewEnv) {
-        // For Replit preview, always use the full origin for API calls
-        apiUrl = `${window.location.origin}/api/pallets`;
-        
-        // If we're in a deep path in preview
-        // Get the base directory path from the current location
-        const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
-        if (basePath) {
-          apiUrl = `${window.location.origin}${basePath}/api/pallets`;
-        } else {
-          apiUrl = `${window.location.origin}/api/pallets`;
-        }
-      }
-          
+      const apiUrl = `${window.location.origin}/api/pallets`;
       console.log(`Fetching from: ${apiUrl}`);
       
       fetch(apiUrl, {
@@ -141,19 +116,11 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           });
         });
     }
-  }, [socket, toast, setPallets, setConnected, setLastSync]);
+  }, [socket, toast]);
 
   useEffect(() => {
     // Log device info on startup for debugging
     console.log('Device info:', getBrowserInfo());
-    
-    // In preview environment, immediately use REST API to load data
-    // This ensures users see data right away without waiting for WebSocket
-    if (window.location.hostname.includes('replit.dev')) {
-      console.log('Preview environment detected, immediately loading data via REST API');
-      // Immediate data load via REST API
-      setTimeout(syncData, 100);
-    }
     
     // For TC70 devices, we use REST API polling instead of WebSockets
     if (isTC70()) {
@@ -163,22 +130,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       const pollData = (retryAttempt = 0) => {
         console.log(`Polling data for TC70 (attempt: ${retryAttempt})`);
         
-        // Construct URL that works in both preview and deployed environments
-        let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
-        
-        // If we're in a Replit preview environment
-        if (window.location.hostname.includes('replit.dev') && 
-            window.location.pathname !== '/' && 
-            !window.location.pathname.startsWith('/api')) {
-          // For Replit preview, use full paths with basePath
-          const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
-          if (basePath) {
-            apiUrl = `${window.location.origin}${basePath}/api/pallets`;
-          } else {
-            apiUrl = `${window.location.origin}/api/pallets`;
-          }
-        }
-        
+        // Use a full absolute URL to avoid any path resolution issues
+        const apiUrl = `${window.location.origin}/api/pallets`;
         console.log(`Fetching from: ${apiUrl}`);
         
         fetch(apiUrl, {
@@ -243,22 +196,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         const pollData = (retryAttempt = 0) => {
           console.log(`Polling data (WebSocket fallback) (attempt: ${retryAttempt})`);
           
-          // Construct URL that works in both preview and deployed environments
-          let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
-          
-          // If we're in a Replit preview and location origin doesn't include the proper base path
-          if (window.location.hostname.includes('replit.dev') && 
-              window.location.pathname !== '/' && 
-              !window.location.pathname.startsWith('/api')) {
-            // For Replit preview, use full paths with basePath
-            const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
-            if (basePath) {
-              apiUrl = `${window.location.origin}${basePath}/api/pallets`;
-            } else {
-              apiUrl = `${window.location.origin}/api/pallets`;
-            }
-          }
-          
+          // Use a full absolute URL to avoid any path resolution issues
+          const apiUrl = `${window.location.origin}/api/pallets`;
           console.log(`Fetching from: ${apiUrl}`);
           
           fetch(apiUrl, {
@@ -323,30 +262,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         return returnObj;
       }
       
-      // Determine appropriate WebSocket URL based on environment
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Base WebSocket URL with /ws path
-      let wsUrl = `${protocol}//${window.location.host}/ws`;
-      
-      // For Replit preview environment, handle potential path prefixing
-      if (window.location.hostname.includes('replit.dev')) {
-        console.log('Preview environment detected, adjusting WebSocket URL');
-        console.log('Current location:', window.location.href);
-        
-        // For preview, handle potential path prefixing
-        if (window.location.pathname !== '/' && 
-            !window.location.pathname.startsWith('/ws')) {
-          // Try to handle the preview environment where front-end paths might be different
-          const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
-          if (basePath) {
-            wsUrl = `${protocol}//${window.location.host}${basePath}/ws`;
-            console.log('Adjusted WebSocket URL for preview:', wsUrl);
-          }
-        }
-      }
-      
-      console.log('Connecting to WebSocket at:', wsUrl);
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
       
       // Calculate the delay based on retry count, with a maximum of 10 seconds
       // For low-power devices, use a longer backoff to conserve battery
@@ -391,26 +308,12 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           
-          // Force a fallback to REST API immediately when a WebSocket error occurs
-          console.log("WebSocket error detected, falling back to REST API");
-          setConnected(false);
-          
-          // Close the faulty connection
-          try {
-            ws.close();
-          } catch (e) {
-            console.error("Error closing WebSocket after error:", e);
-          }
-          
-          // Perform an immediate REST API fallback call
-          syncData();
-          
           // Only show error notification if we're still connected and a new error occurs
           // And not on TC70 or other low-power devices
           if (connected && !isLowPowerDevice()) {
             toast({
               title: "Connection Error",
-              description: "Switched to backup connection mode. Your data will still be available.",
+              description: "There was a problem with the real-time connection. Some updates may be delayed.",
               variant: "destructive"
             });
           }
@@ -418,7 +321,6 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           // Log additional context
           console.log('WebSocket readyState:', ws.readyState);
           console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
-          console.log('Using REST API fallback');
         };
         
         setSocket(ws);
@@ -664,7 +566,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         }
       }
     };
-  }, [toast, connected, syncData]);
+  }, [toast, connected]);
 
   return (
     <WebSocketContext.Provider value={{ 

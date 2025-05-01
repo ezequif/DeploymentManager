@@ -28,8 +28,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create WebSocket server with security options
   const wss = new WebSocketServer({ 
-    server: httpServer,
-    path: '/ws', // Specify '/ws' as the fixed path to avoid conflicts with Vite WebSocket
+    server: httpServer, 
+    path: '/ws',
     // Additional security options
     clientTracking: true, // Track connected clients
     perMessageDeflate: {
@@ -72,49 +72,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let successCount = 0;
     let failCount = 0;
     
-    // Convert message to string once to avoid repeated stringify operations
-    let messageStr: string;
-    try {
-      messageStr = JSON.stringify(message);
-    } catch (err) {
-      console.error('Error stringifying message for broadcast:', err);
-      console.error('Message that failed:', message);
-      return; // Exit without attempting to broadcast invalid message
-    }
-    
-    // Create a defensive copy to avoid issues if the set changes during iteration
-    const clientsArray = Array.from(wss.clients);
-    
-    for (const client of clientsArray) {
+    wss.clients.forEach((client) => {
       try {
-        if (client.readyState === WS.OPEN) { // Use the explicit WS.OPEN constant
-          client.send(messageStr);
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(JSON.stringify(message));
           successCount++;
         } else {
           console.log(`Client not ready (state: ${client.readyState}), skipping broadcast`);
           failCount++;
-          
-          // Close connections that aren't open
-          if (client.readyState !== WS.CONNECTING) {
-            try {
-              client.terminate(); // Force close problematic connections
-            } catch (e) {
-              console.error('Error terminating stale connection:', e);
-            }
-          }
         }
       } catch (error) {
         console.error('Error sending WebSocket message:', error);
         failCount++;
-        
-        // Try to clean up failed connection
-        try {
-          client.terminate();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
       }
-    }
+    });
     
     console.log(`Broadcast complete - success: ${successCount}, failed: ${failCount}`);
   };
@@ -160,56 +131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 60000); // Sync every 60 seconds
   
-  // Keep track of connection attempts per IP to prevent DOS attacks
-  const connectionAttempts = new Map<string, { count: number, lastAttempt: number }>();
-  
-  // Cleanup connection attempts map periodically to prevent memory leaks
-  const cleanupConnectionsInterval = setInterval(() => {
-    const now = Date.now();
-    // Convert to array for compatibility with older TypeScript
-    const entries = Array.from(connectionAttempts.entries());
-    
-    // Process each entry
-    for (let i = 0; i < entries.length; i++) {
-      const [ip, data] = entries[i];
-      // Remove entries older than 5 minutes
-      if (now - data.lastAttempt > 5 * 60 * 1000) {
-        connectionAttempts.delete(ip);
-      }
-    }
-  }, 60000); // Cleanup every minute
-  
-  intervals.push(cleanupConnectionsInterval);
-  
-  // WebSocket connection with enhanced security
+  // WebSocket connection
   wss.on('connection', (ws, req) => {
-    // Get client information for security checks and logging
-    const ipAddress = req.headers['x-forwarded-for'] || 
-                    req.socket.remoteAddress || 
-                    'unknown';
-    const clientIp = typeof ipAddress === 'string' ? ipAddress : Array.isArray(ipAddress) ? ipAddress[0] : 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    
-    // Basic rate limiting
-    const ipData = connectionAttempts.get(clientIp) || { count: 0, lastAttempt: 0 };
-    const now = Date.now();
-    
-    // Reset count if last attempt was more than 1 minute ago
-    if (now - ipData.lastAttempt > 60000) {
-      ipData.count = 0;
-    }
-    
-    ipData.count++;
-    ipData.lastAttempt = now;
-    connectionAttempts.set(clientIp, ipData);
-    
-    // Reject if too many connection attempts (more than 60 connections per minute)
-    if (ipData.count > 60) {
-      console.warn(`Connection rate limit exceeded for IP: ${clientIp}`);
-      ws.close(1008, 'Rate limit exceeded');
-      return;
-    }
-    
     // Basic security check for origin
     const origin = req.headers.origin || '';
     
@@ -223,14 +146,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Set appropriate timeouts
-    ws.on('open', () => {
-      (ws as any).isAlive = true;
-    });
+    // Extract client information
+    const ipAddress = req.headers['x-forwarded-for'] || 
+                      req.socket.remoteAddress || 
+                      'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
     
-    (ws as any).isAlive = true;
-    
-    // We've already captured userAgent above
+    // Connection rate limiting (example)
+    const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
     
     // Create a unique client ID with more entropy
     const generateSecureClientId = () => {
