@@ -40,6 +40,9 @@ export function formatQuantity(quantity: number): string {
 // Constants for weight conversion
 const LBS_TO_KGS_RATIO = 0.45359237; // 1 pound = 0.45359237 kilograms
 const KGS_TO_LBS_RATIO = 2.2046226218; // 1 kilogram = 2.2046226218 pounds
+// Make these constants available outside this module for debugging
+window.LBS_TO_KGS_RATIO = LBS_TO_KGS_RATIO;
+window.KGS_TO_LBS_RATIO = KGS_TO_LBS_RATIO;
 
 /**
  * Convert weight between LBS and KGS
@@ -49,18 +52,27 @@ const KGS_TO_LBS_RATIO = 2.2046226218; // 1 kilogram = 2.2046226218 pounds
  * @returns The converted weight value
  */
 export function convertWeight(value: number, fromUnit: 'LBS' | 'KGS', toUnit: 'LBS' | 'KGS'): number {
+  console.log('convertWeight:', { value, fromUnit, toUnit });
+  
   // If units are the same, return the value unchanged
   if (fromUnit === toUnit) return value;
   
+  let result: number;
+  
   // Convert based on the direction
   if (fromUnit === 'LBS' && toUnit === 'KGS') {
-    return value * LBS_TO_KGS_RATIO;
+    result = value * LBS_TO_KGS_RATIO;
+    console.log(`Converting ${value} LBS to KGS: ${result}`);
   } else if (fromUnit === 'KGS' && toUnit === 'LBS') {
-    return value * KGS_TO_LBS_RATIO;
+    result = value * KGS_TO_LBS_RATIO;
+    console.log(`Converting ${value} KGS to LBS: ${result}`);
+  } else {
+    // Fallback (should never reach here)
+    result = value;
+    console.log('No conversion performed - returning original value');
   }
   
-  // Fallback (should never reach here)
-  return value;
+  return result;
 }
 
 /**
@@ -113,6 +125,8 @@ export function formatWeightForDisplay(
   preferredUnit: 'LBS' | 'KGS', 
   autoConvert: boolean
 ): string {
+  console.log('formatWeightForDisplay INPUT:', { value, unit, preferredUnit, autoConvert });
+  
   // First determine which unit to use
   let displayUnit = unit;
   let convertedValue = value;
@@ -123,10 +137,13 @@ export function formatWeightForDisplay(
     // Only convert if the units are different
     if (unit !== preferredUnit) {
       convertedValue = convertWeight(value, unit, preferredUnit);
+      console.log('Converting from', unit, 'to', preferredUnit, ':', value, '->', convertedValue);
     }
   }
   
-  return formatWeightWithUnit(convertedValue, displayUnit);
+  const result = formatWeightWithUnit(convertedValue, displayUnit);
+  console.log('formatWeightForDisplay OUTPUT:', result);
+  return result;
 }
 
 // Helper function to convert date to Eastern Time for comparison

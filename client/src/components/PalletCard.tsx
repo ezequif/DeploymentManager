@@ -397,12 +397,9 @@ export default function PalletCard({ pallet }: PalletCardProps) {
                       <div className="flex justify-between items-start mb-1.5 sm:mb-2">
                         <div className="font-medium text-sm sm:text-base">{lot.lotNumber}</div>
                         <div className="text-base sm:text-lg font-bold">
-                          {formatWeightForDisplay(
-                            lot.quantity, 
-                            lot.unit as "KGS" | "LBS", 
-                            preferredUnit, 
-                            autoConvert
-                          )}
+                          {lot.unit === 'LBS' ? 
+                            `${lot.quantity.toFixed(1)} LBS` : 
+                            `${(lot.quantity * 2.2046226218).toFixed(1)} LBS`}
                         </div>
                       </div>
                       
