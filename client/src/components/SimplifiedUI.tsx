@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PalletWithLots, Lot } from '@shared/schema';
 import { useWebSocket } from '@/lib/websocket';
 import { isTC70 } from '@/lib/deviceDetection';
-import { formatDate, formatQuantity } from '@/lib/formatUtils';
+import { formatDate, formatQuantity, formatWeightForDisplay } from '@/lib/formatUtils';
 import { QrCode } from 'lucide-react';
 import { useKeyboard } from '@/hooks/use-keyboard';
+import { useUnitSettings } from '@/hooks/use-unit-settings';
 
 /**
  * A simplified UI specifically optimized for TC70 handheld devices and other low-power devices
@@ -19,6 +20,7 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
   // Force sync data when component loads - essential for TC70 devices
   // that might not support WebSockets properly
   const { pallets, syncData, connected, lastSync } = useWebSocket();
+  const { preferredUnit, autoConvert } = useUnitSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -191,8 +193,38 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
 }
 
 function PalletItem({ pallet, onClick }: { pallet: PalletWithLots; onClick: () => void }) {
-  const totalQuantity = pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0);
+  const { preferredUnit, autoConvert } = useUnitSettings();
   const lotCount = pallet.lots.length;
+  
+  // Calculate total quantity with unit conversion if needed
+  let totalQuantity = 0;
+  let displayUnit = preferredUnit;
+  
+  if (pallet.lots.length > 0) {
+    // If all lots have the same unit, use that unit for display
+    const firstLotUnit = pallet.lots[0].unit;
+    const allSameUnit = pallet.lots.every(lot => lot.unit === firstLotUnit);
+    
+    if (allSameUnit) {
+      displayUnit = firstLotUnit;
+      totalQuantity = pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0);
+    } else if (autoConvert) {
+      // Convert all to preferred unit if autoConvert is enabled
+      totalQuantity = pallet.lots.reduce((sum, lot) => {
+        if (lot.unit === preferredUnit) {
+          return sum + lot.quantity;
+        } else {
+          // Convert from KGS to LBS or vice versa
+          const conversionFactor = lot.unit === 'KGS' ? 2.20462 : 0.453592;
+          return sum + (lot.quantity * conversionFactor);
+        }
+      }, 0);
+    } else {
+      // If units are mixed and autoConvert is disabled, just sum them up
+      // This is not ideal but keeps the logic simple
+      totalQuantity = pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0);
+    }
+  }
   
   return (
     <button
@@ -206,18 +238,22 @@ function PalletItem({ pallet, onClick }: { pallet: PalletWithLots; onClick: () =
       <div className="text-sm truncate">RM# {pallet.rmNumber}</div>
       <div className="text-sm truncate">Location: {pallet.location}</div>
       <div className="text-sm font-medium">
-        {totalQuantity > 0 ? `Total: ${formatQuantity(totalQuantity)}` : 'Empty'}
+        {totalQuantity > 0 ? `Total: ${formatQuantity(totalQuantity)} ${displayUnit}` : 'Empty'}
       </div>
     </button>
   );
 }
 
 function LotItem({ lot }: { lot: Lot }) {
+  const { preferredUnit, autoConvert } = useUnitSettings();
+  
   return (
     <div className="p-3 border rounded bg-gray-50">
       <div className="flex justify-between">
         <span className="font-bold">{lot.lotNumber}</span>
-        <span className="font-medium">{formatQuantity(lot.quantity)} {lot.unit}</span>
+        <span className="font-medium">
+          {formatWeightForDisplay(lot.quantity, lot.unit, preferredUnit, autoConvert)}
+        </span>
       </div>
       <div className="text-sm">Expires: {formatDate(lot.expirationDate)}</div>
       <div className="text-sm text-gray-500">Created: {formatDate(lot.createdAt)}</div>
