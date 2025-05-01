@@ -16,42 +16,68 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
   const [isTC70, setIsTC70] = useState(false);
   const { toast } = useToast();
 
-  // Check for TC70 device on mount
+  // Device detection and configuration
+  const [isAndroidTablet, setIsAndroidTablet] = useState(false);
+  
   useEffect(() => {
-    // Check if this might be a TC70/TC75 device (based on user agent or screen size)
+    // Check device type
     const userAgent = navigator.userAgent;
+    
+    // TC70/Datawedge detection (handheld scanners)
     const isLikelyDatawedgeDevice = 
       userAgent.includes("Android") && 
       (userAgent.includes("TC") || 
       userAgent.includes("MC") || 
       userAgent.includes("ET"));
     
-    // Also consider screen dimensions as a TC70 heuristic
+    // TC70 dimensions heuristic
     const hasTC70Dimensions = 
       window.screen.width <= 800 && 
       window.screen.height <= 800 &&
       window.screen.width >= 400;
     
-    // Store these values for later use
+    // Check specifically for Android tablet
+    const isTablet = 
+      /iPad/.test(userAgent) || 
+      (/Android/.test(userAgent) && !/Mobile/.test(userAgent)) ||
+      (window.innerWidth >= 600 && window.innerHeight >= 600);
+    
+    // Determine device type with final checks
     const isTC70Device = isLikelyDatawedgeDevice || hasTC70Dimensions;
+    const isAndroid = /Android/.test(userAgent);
+    const isAndroidTabletDevice = isAndroid && isTablet;
+    
     setIsTC70(isTC70Device);
+    setIsAndroidTablet(isAndroidTabletDevice);
+    
+    // Automatically set to manual entry for Android tablets
+    if (isAndroidTabletDevice) {
+      setManualEntry(true);
+      toast({
+        title: "Android Tablet Detected",
+        description: "Manual entry mode activated for better compatibility."
+      });
+    }
     
     // Log device info for debugging
-    console.log("Device info:", {
+    console.log("Device detection:", {
       userAgent,
+      isAndroid,
+      isTablet,
       isTC70: isTC70Device,
+      isAndroidTablet: isAndroidTabletDevice,
       protocol: window.location.protocol,
       hostname: window.location.hostname,
       screenWidth: window.screen.width,
       screenHeight: window.screen.height
     });
     
-    // For TC70 devices with built-in scanners, use manual entry and keyboard listener
+    // For TC70 devices with built-in scanners, configure keyboard listener
     if (isTC70Device) {
       setManualEntry(true);
       
       // Listen for barcode scan events from hardware scanner
-      // TC70 with DataWedge often sends events as keyboard input
+      // TC70 with DataWedge sends events as keyboard input
       const handleKeyDown = (e: KeyboardEvent) => {
         // DataWedge typically finishes with an Enter key
         if (e.key === "Enter" && manualCode) {
@@ -67,7 +93,7 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         document.removeEventListener("keydown", handleKeyDown);
       };
     }
-  }, [manualCode, onClose, onScan]);
+  }, [manualCode, onClose, onScan, toast]);
 
   // Handle manual code submission
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -109,6 +135,15 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
         
         {manualEntry ? (
           <div className="p-4">
+            {isAndroidTablet && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <h3 className="text-sm font-medium text-yellow-800">Android Tablet Detected</h3>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Manual entry mode has been activated for better compatibility with your device.
+                </p>
+              </div>
+            )}
+            
             <form onSubmit={handleManualSubmit}>
               <div className="space-y-4">
                 <div className="grid w-full items-center gap-1.5">
@@ -129,7 +164,7 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
                   <Button type="submit" disabled={!manualCode}>
                     Submit Code
                   </Button>
-                  {!isTC70 && (
+                  {(!isTC70 && !isAndroidTablet) && (
                     <Button 
                       type="button" 
                       variant="outline" 
