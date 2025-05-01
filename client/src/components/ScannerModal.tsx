@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ScanLineIcon, QrCodeIcon, CameraIcon, KeyboardIcon, SwitchCameraIcon, AlertTriangle } from "lucide-react";
 import Quagga from "@ericblade/quagga2";
+import TabletScannerComponent from "./TabletScannerComponent";
 
 interface ScannerModalProps {
   onClose: () => void;
@@ -138,10 +139,17 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     // Check if this is a tablet specifically
-    const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+    // We're using a more comprehensive detection to catch Android tablets
+    const isTablet = 
+      /iPad/.test(navigator.userAgent) || 
+      (/Android/.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent)) ||
+      (window.innerWidth >= 600 && window.innerHeight >= 600 && isMobileDevice);
+    
+    console.log("Device detection: Tablet =", isTablet, "Mobile =", isMobileDevice);
     setIsTabletDevice(isTablet);
     
-    // Force direct video mode for tablets to avoid Quagga issues
+    // We'll use our new TabletScannerComponent for tablets instead of Quagga
+    // But we'll keep the flag for backward compatibility
     setUseDirectVideo(isTablet);
     
     // Check if this might be a TC70/TC75 device (based on user agent or screen size)
@@ -195,7 +203,15 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
       };
     }
     
-    // Regular browser flow
+    // For tablets, we'll use our optimized TabletScannerComponent instead of Quagga
+    // This should help with the blue screen issue on tablet cameras
+    if (isTablet) {
+      console.log("Tablet detected, using TabletScannerComponent");
+      // Nothing else to do here - the component will handle its own camera setup
+      return;
+    }
+    
+    // Regular browser flow - only for non-tablets
     if (!manualEntry) {
       try {
         // For tablets with compatibility issues, use absolute minimal constraints
@@ -668,32 +684,15 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             </div>
           ) : (
             <div className="p-4">
-              {isTabletDevice && useDirectVideo ? (
-                /* Direct Video UI for tablets */
-                <div className="bg-gray-100 rounded-lg mb-4 relative w-full h-[300px] overflow-hidden">
-                  <video 
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
-                  
-                  {/* Targeting guides that float above the camera view */}
-                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                    <div className="w-3/4 h-1/2 border-2 border-primary rounded-lg flex items-center justify-center">
-                      <div className="text-gray-400 text-center bg-black/20 px-2 py-1 rounded">
-                        Tablet Direct Mode: Take a photo of the barcode
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Corner markers to indicate scanning area */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-20"></div>
-                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary z-20"></div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary z-20"></div>
-                  <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
-                </div>
+              {isTabletDevice ? (
+                /* Use our specialized tablet scanner component */
+                <TabletScannerComponent 
+                  onCapture={(code) => {
+                    if (onScan) onScan(code);
+                    onClose();
+                  }}
+                  onClose={onClose}
+                />
               ) : (
                 /* Standard Quagga UI for non-tablets */
                 <div 
@@ -721,30 +720,36 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
                   <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary z-20"></div>
                 </div>
               )}
-              <div className="text-center mb-4">
-                <p className="text-gray-600 mb-2">Center the barcode in the box above</p>
-                <div className="font-medium text-lg text-primary">
-                  {scanResult ? scanResult : "Ready to scan"}
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={switchCamera}
-                  disabled={cameras.length <= 1}
-                >
-                  <SwitchCameraIcon className="h-4 w-4 mr-2" />
-                  Switch Camera
-                </Button>
-                <Button 
-                  className="w-full"
-                  onClick={() => setManualEntry(true)}
-                >
-                  <KeyboardIcon className="h-4 w-4 mr-2" />
-                  Manual Entry
-                </Button>
-              </div>
+              
+              {/* Only show standard controls for non-tablet mode */}
+              {!isTabletDevice && (
+                <>
+                  <div className="text-center mb-4">
+                    <p className="text-gray-600 mb-2">Center the barcode in the box above</p>
+                    <div className="font-medium text-lg text-primary">
+                      {scanResult ? scanResult : "Ready to scan"}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={switchCamera}
+                      disabled={cameras.length <= 1}
+                    >
+                      <SwitchCameraIcon className="h-4 w-4 mr-2" />
+                      Switch Camera
+                    </Button>
+                    <Button 
+                      className="w-full"
+                      onClick={() => setManualEntry(true)}
+                    >
+                      <KeyboardIcon className="h-4 w-4 mr-2" />
+                      Manual Entry
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )
         )}
