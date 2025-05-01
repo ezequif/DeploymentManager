@@ -87,16 +87,16 @@ export function autoConvertWeight(
   preferredUnit: 'LBS' | 'KGS', 
   autoConvert: boolean
 ): { value: number, unit: 'LBS' | 'KGS' } {
-  // If auto-convert is disabled or the units already match, return as-is
-  if (!autoConvert || currentUnit === preferredUnit) {
-    return { value, unit: currentUnit };
+  // Always convert to preferred unit when auto-convert is enabled
+  if (autoConvert && currentUnit !== preferredUnit) {
+    return {
+      value: convertWeight(value, currentUnit, preferredUnit),
+      unit: preferredUnit
+    };
   }
   
-  // Otherwise, convert to the preferred unit
-  return {
-    value: convertWeight(value, currentUnit, preferredUnit),
-    unit: preferredUnit
-  };
+  // Otherwise, return as-is
+  return { value, unit: currentUnit };
 }
 
 /**
@@ -113,9 +113,18 @@ export function formatWeightForDisplay(
   preferredUnit: 'LBS' | 'KGS', 
   autoConvert: boolean
 ): string {
-  const { value: convertedValue, unit: displayUnit } = autoConvertWeight(
-    value, unit, preferredUnit, autoConvert
-  );
+  // First determine which unit to use
+  let displayUnit = unit;
+  let convertedValue = value;
+
+  // If autoConvert is enabled, always use the preferred unit
+  if (autoConvert) {
+    displayUnit = preferredUnit;
+    // Only convert if the units are different
+    if (unit !== preferredUnit) {
+      convertedValue = convertWeight(value, unit, preferredUnit);
+    }
+  }
   
   return formatWeightWithUnit(convertedValue, displayUnit);
 }
