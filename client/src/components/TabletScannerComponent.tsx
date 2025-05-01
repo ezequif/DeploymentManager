@@ -28,12 +28,32 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
     };
   }, [scanning]);
 
-  // Start the Quagga scanner with simplified settings
+  // Start the Quagga scanner with optimized settings
   const startScanner = async () => {
     try {
       // Make sure the scanner container exists
       if (!scannerRef.current) {
         throw new Error("Scanner container not found");
+      }
+
+      // Check camera availability
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API not supported in this browser");
+      }
+
+      // Attempt to get list of available cameras
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(device => device.kind === 'videoinput');
+        console.log("Available cameras:", cameras);
+        
+        // If no cameras found, throw error
+        if (cameras.length === 0) {
+          throw new Error("No cameras found on this device");
+        }
+      } catch (err) {
+        console.warn("Could not enumerate cameras:", err);
+        // Continue anyway - some devices don't support enumeration but still have cameras
       }
 
       // Log device info
@@ -48,19 +68,25 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
         Quagga.stop();
       }
       
-      // Configure and initialize Quagga with simplified settings
+      // Determine optimal worker count based on device capabilities
+      // More workers = better performance but more battery/CPU usage
+      const workerCount = navigator.hardwareConcurrency 
+        ? Math.min(navigator.hardwareConcurrency - 1, 2) // Use fewer workers for better battery life
+        : 1;
+      
+      // Configure and initialize Quagga with optimized settings
       await Quagga.init({
         inputStream: {
           name: "Live",
           type: "LiveStream",
           target: scannerRef.current,
           constraints: {
-            facingMode: "environment",
-            width: { min: 450 },
-            height: { min: 300 },
+            facingMode: "environment", // Use back camera
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
             aspectRatio: { min: 1, max: 2 }
           },
-          area: { // Only scan middle 80% of the detection area
+          area: { // Only scan middle 80% of the detection area for better accuracy
             top: "10%",
             right: "10%",
             left: "10%",
@@ -68,27 +94,29 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
           }
         },
         locator: {
-          patchSize: "medium",
-          halfSample: true
+          patchSize: "medium", // Can be x-small, small, medium, large, x-large
+          halfSample: true     // Improves performance
         },
-        numOfWorkers: navigator.hardwareConcurrency 
-          ? Math.min(navigator.hardwareConcurrency - 1, 4) 
-          : 1,
-        frequency: 10,
+        numOfWorkers: workerCount,
+        frequency: 10,         // How many frames to process per second
         decoder: {
           readers: [
-            "code_128_reader",
-            "ean_reader",
-            "ean_8_reader",
-            "code_39_reader",
-            "code_93_reader",
-            "upc_reader",
-            "upc_e_reader",
-            "i2of5_reader"
+            // Start with most common formats
+            "code_128_reader",  // Common in logistics
+            "ean_reader",       // Product barcodes (EAN-13)
+            "ean_8_reader",     // Smaller product barcodes
+            "code_39_reader",   // Very common in industry
+            "code_93_reader",   // Used in logistics
+            "upc_reader",       // US product barcodes
+            "upc_e_reader",     // Compressed UPC
+            "i2of5_reader",     // Industrial packaging
+            "2of5_reader",      // Industrial packaging
+            "codabar_reader"    // Used in libraries/healthcare
           ],
-          multiple: false
+          multiple: false      // Only find one barcode at a time for better performance
+          // Note: Debug options removed due to TypeScript compatibility
         },
-        locate: true
+        locate: true            // Try to locate the barcode in the image
       });
       
       // Start Quagga
@@ -101,14 +129,32 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
         description: "Position barcode in view for scanning"
       });
       
+      // Store detected codes with confidence for better accuracy
+      let detectionResults: {code: string, count: number, confidence: number}[] = [];
+      
       // Set up barcode detection handler
       Quagga.onDetected((result) => {
         if (result && result.codeResult && result.codeResult.code) {
           const code = result.codeResult.code;
-          console.log("Barcode detected:", code);
+          // Cast to any to access confidence property (TypeScript definition is incomplete)
+          const confidence = (result.codeResult as any).confidence || 0;
           
-          // Validate the barcode (simple length check)
-          if (code.length >= 5 && code.length <= 30) {
+          console.log("Barcode detected:", code, "Confidence:", confidence);
+          
+          // Store this detection
+          const existingResult = detectionResults.find(r => r.code === code);
+          if (existingResult) {
+            existingResult.count++;
+            existingResult.confidence = Math.max(existingResult.confidence, confidence);
+          } else {
+            detectionResults.push({ code, count: 1, confidence });
+          }
+          
+          // Check if any code has been detected multiple times with good confidence
+          const bestResult = detectionResults.find(r => r.count >= 2 && r.confidence > 0.7);
+          
+          if (bestResult) {
+            // We have a reliable code
             // Stop scanning
             Quagga.stop();
             setScanning(false);
@@ -121,11 +167,16 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
             // Notify success
             toast({
               title: "Barcode Detected!",
-              description: code
+              description: bestResult.code
             });
             
             // Return the barcode
-            onCapture(code);
+            onCapture(bestResult.code);
+          }
+          
+          // Limit the size of the results array
+          if (detectionResults.length > 10) {
+            detectionResults = detectionResults.slice(-10);
           }
         }
       });

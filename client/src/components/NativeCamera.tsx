@@ -54,6 +54,11 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         // Ignore errors on stop
       }
       
+      // Check if camera API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API not supported in this browser");
+      }
+      
       // Get list of cameras first
       await getCameras();
       
@@ -61,9 +66,24 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
       
       // Configuration for device selection
       let deviceId = undefined;
-      if (availableCameras.length > 0 && currentCameraIndex < availableCameras.length) {
-        deviceId = availableCameras[currentCameraIndex].deviceId;
-        console.log("Selected camera:", availableCameras[currentCameraIndex].label);
+      
+      // If we have camera info, try to select the back camera
+      // Many devices have multiple cameras (front/back)
+      if (availableCameras.length > 0) {
+        // First try to find a camera with "back" or "environment" in the label
+        const backCamera = availableCameras.find(camera => 
+          camera.label && 
+          (camera.label.toLowerCase().includes('back') || 
+           camera.label.toLowerCase().includes('environment')));
+           
+        if (backCamera) {
+          deviceId = backCamera.deviceId;
+          console.log("Selected back camera:", backCamera.label);
+        } else if (currentCameraIndex < availableCameras.length) {
+          // Just use the currently selected camera index
+          deviceId = availableCameras[currentCameraIndex].deviceId;
+          console.log("Selected camera by index:", availableCameras[currentCameraIndex].label || "Unnamed camera");
+        }
       }
       
       // Make sure video element exists
@@ -72,44 +92,74 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         throw new Error("Video element not found");
       }
       
-      // Initialize Quagga with our configuration
+      // Determine optimal configuration based on device capabilities
+      const workerCount = navigator.hardwareConcurrency 
+        ? Math.min(Math.max(1, navigator.hardwareConcurrency - 1), 2) // Use 1-2 workers
+        : 1;
+      
+      // Store detected barcodes for confidence-based selection
+      const detectedCodes: Map<string, {count: number, confidence: number}> = new Map();
+      
+      // Initialize Quagga with enhanced configuration for better barcode detection
       await Quagga.init({
         inputStream: {
           name: "Live",
           type: "LiveStream",
           target: videoElement,
           constraints: {
-            facingMode: "environment",
+            // Try to use back camera if possible
+            facingMode: deviceId ? undefined : "environment",
+            // If we have a specific deviceId, use it
             deviceId: deviceId ? { exact: deviceId } : undefined,
-            width: { min: 640 },
-            height: { min: 480 },
+            // Request higher resolution for better results
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
             aspectRatio: { min: 1, max: 2 }
+          },
+          area: { // Only scan middle area of the video
+            top: "10%",    // top border
+            right: "10%",  // right border
+            left: "10%",   // left border
+            bottom: "10%"  // bottom border
           }
         },
         locator: {
-          patchSize: "medium",
-          halfSample: true
+          patchSize: "medium", // Can be x-small, small, medium, large, x-large
+          halfSample: true     // Improves performance
         },
-        numOfWorkers: 2,
-        frequency: 10,
+        numOfWorkers: workerCount,
+        frequency: 10,         // Frames per second to analyze
         decoder: {
           readers: [
-            "code_128_reader",
-            "ean_reader",
-            "ean_8_reader",
-            "code_39_reader",
-            "code_93_reader",
-            "upc_reader",
-            "upc_e_reader",
-            "i2of5_reader"
-          ]
+            // Include all readers but prioritize common barcode formats for warehouse
+            "code_128_reader",  // Very common in logistics
+            "code_39_reader",   // Common in industry
+            "ean_reader",       // Product barcodes (EAN-13)
+            "ean_8_reader",     // Smaller product barcodes
+            "code_93_reader",   // Used in logistics
+            "upc_reader",       // US product barcodes
+            "upc_e_reader",     // Compressed UPC
+            "i2of5_reader",     // Industrial packaging
+            "2of5_reader",      // Used in logistics
+            "codabar_reader"    // Used in libraries/healthcare
+          ],
+          multiple: false,      // Only find one barcode for better performance
+          debug: {
+            showCanvas: true,   // Show processing canvas for visualization
+            showPatches: false, // Don't show patches for performance
+            showFoundPatches: false,
+            showSkeleton: false,
+            showLabels: false,
+            showPatchLabels: false,
+            showRemainingPatchLabels: false
+          }
         },
-        locate: true
+        locate: true            // Try to locate the barcode in the image
       });
       
       // Start Quagga
       Quagga.start();
-      console.log("Quagga started");
+      console.log("Quagga started successfully");
       
       // Use Quagga's stream directly
       try {
@@ -136,28 +186,98 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
         // Just continue, we still have Quagga working
       }
       
-      // Set up barcode detection handler
+      // Add processing feedback
+      Quagga.onProcessed((result) => {
+        const drawingCanvas = document.querySelector('canvas.drawingBuffer');
+        if (drawingCanvas) {
+          const ctx = drawingCanvas.getContext('2d');
+          if (ctx && result) {
+            // Draw boxes around potential barcodes
+            if (result.boxes) {
+              ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+              
+              // Draw green boxes around all potential barcode areas
+              result.boxes.forEach((box: any) => {
+                if (box) {
+                  ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                  ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  
+                  // Make sure box has the expected structure
+                  if (Array.isArray(box) && box.length >= 4) {
+                    try {
+                      ctx.moveTo(box[0][0], box[0][1]);
+                      ctx.lineTo(box[1][0], box[1][1]);
+                      ctx.lineTo(box[2][0], box[2][1]);
+                      ctx.lineTo(box[3][0], box[3][1]);
+                      ctx.lineTo(box[0][0], box[0][1]);
+                      ctx.stroke();
+                    } catch (e) {
+                      // Ignore drawing errors
+                    }
+                  }
+                }
+              });
+            }
+            
+            // Draw blue box around the detected barcode
+            if (result.box) {
+              ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.moveTo(result.box.x, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x, result.box.y);
+              ctx.stroke();
+            }
+          }
+        }
+      });
+      
+      // Set up barcode detection handler with improved confidence
       Quagga.onDetected((result) => {
         if (result && result.codeResult && result.codeResult.code) {
-          console.log("Barcode detected:", result.codeResult.code);
-          // Only process if code is alphanumeric and reasonable length
-          if (/^[a-zA-Z0-9\-\_]{5,20}$/.test(result.codeResult.code)) {
+          const code = result.codeResult.code;
+          const confidence = result.codeResult.confidence || 0;
+          
+          console.log("Barcode detected:", code, "Confidence:", confidence);
+          
+          // Update detection tracking
+          if (detectedCodes.has(code)) {
+            const data = detectedCodes.get(code)!;
+            data.count++;
+            data.confidence = Math.max(data.confidence, confidence);
+            detectedCodes.set(code, data);
+          } else {
+            detectedCodes.set(code, { count: 1, confidence: confidence });
+          }
+          
+          // Check if we have a reliable barcode
+          // Either high confidence or detected multiple times
+          const reliable = detectedCodes.get(code)!.count >= 2 || 
+                          (detectedCodes.get(code)!.count >= 1 && confidence > 0.8);
+          
+          // Only process if code looks valid (appropriate format for warehouse barcodes)
+          // Customize this regex to match your specific barcode format
+          if (reliable && /^[a-zA-Z0-9\-\_]{5,30}$/.test(code)) {
             // Stop scanning
             Quagga.stop();
             
             // Signal successful scan with haptic feedback if available
             if (navigator.vibrate) {
-              navigator.vibrate(100);
+              navigator.vibrate([100, 50, 100]); // Double pulse for clear feedback
             }
             
             // Notify success
             toast({
-              title: "Barcode Detected",
-              description: `${result.codeResult.code}`
+              title: "Barcode Detected!",
+              description: code
             });
             
             // Return the barcode value
-            onCapture(result.codeResult.code);
+            onCapture(code);
           }
         }
       });
