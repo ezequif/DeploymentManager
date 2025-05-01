@@ -79,9 +79,24 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
     // Regular browser flow
     if (!manualEntry) {
       try {
-        // First request camera permission
-        navigator.mediaDevices.getUserMedia({ video: true })
+        // First request camera permission with relaxed constraints for better tablet compatibility
+        navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 640, min: 320 },
+            height: { ideal: 480, min: 240 },
+            facingMode: "environment",
+            // Relax aspect ratio constraint entirely
+            aspectRatio: { min: 0.5, max: 2.5 }
+          } 
+        })
           .then(stream => {
+            // Log camera capabilities for debugging
+            const videoTracks = stream.getVideoTracks();
+            if (videoTracks.length > 0) {
+              const settings = videoTracks[0].getSettings();
+              console.log("Active camera settings:", settings);
+            }
+            
             // Stop the stream immediately, we just needed permission
             stream.getTracks().forEach(track => track.stop());
             
@@ -224,10 +239,11 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             type: "LiveStream",
             target: scannerRef.current,
             constraints: {
-              width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 },
-              // Full 16:9 or 4:3 aspect ratios
-              aspectRatio: { min: 1, max: 2 },
+              // Much more relaxed constraints for wider device compatibility
+              width: { min: 320, ideal: 720, max: 1920 },
+              height: { min: 240, ideal: 540, max: 1080 },
+              // Relaxed aspect ratio constraints for tablets
+              aspectRatio: { min: 0.5, max: 2 },
               facingMode: "environment",
               // Only use deviceId if it's provided and not empty
               ...(deviceId ? { deviceId } : {})
@@ -264,8 +280,13 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
           },
           locate: true,
           locator: {
-            patchSize: "medium",
-            halfSample: true
+            patchSize: "large",
+            halfSample: true,
+            debug: {
+              showCanvas: true,
+              showPatches: true,
+              showFoundPatches: true
+            }
           }
         }, function(err) {
           if (err) {
@@ -274,11 +295,53 @@ export default function ScannerModal({ onClose, onScan }: ScannerModalProps) {
             // Check if we're running in Replit environment
             const isReplitEnv = window.location.hostname.includes('replit');
             
+            // Create more specific error message
+            let errorMsg = "Could not initialize barcode scanner. Please use manual entry.";
+            
+            // For tablet-specific issues, provide more helpful guidance
+            if (err.name === "OverconstrainedError" || 
+                (err.message && err.message.includes("constraint"))) {
+              errorMsg = "Your tablet's camera doesn't support the requested settings. Trying alternative settings...";
+              
+              // For constraint errors, try again with minimal constraints
+              setTimeout(() => {
+                if (scannerRef.current) {
+                  Quagga.init({
+                    inputStream: {
+                      name: "Live",
+                      type: "LiveStream",
+                      target: scannerRef.current,
+                      constraints: {
+                        // Absolute minimal constraints
+                        facingMode: "environment"
+                      },
+                      willReadFrequently: true
+                    },
+                    decoder: {
+                      readers: ["code_128_reader", "ean_reader", "code_39_reader"]
+                    },
+                    locate: true
+                  }, function(err2) {
+                    if (err2) {
+                      console.error("Second attempt failed:", err2);
+                      setManualEntry(true);
+                    } else {
+                      console.log("Second attempt succeeded with minimal constraints");
+                      Quagga.start();
+                    }
+                  });
+                }
+              }, 1000);
+              
+              // Return early to prevent showing manual entry immediately
+              return;
+            }
+            
             toast({
               title: "Scanner Error",
               description: isReplitEnv 
                 ? "Camera scanner isn't available in the Replit environment. It will work when deployed to a real device."
-                : "Could not initialize barcode scanner. Please use manual entry.",
+                : errorMsg,
               variant: "destructive"
             });
             
