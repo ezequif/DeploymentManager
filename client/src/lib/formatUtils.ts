@@ -40,9 +40,9 @@ export function formatQuantity(quantity: number): string {
 // Constants for weight conversion
 const LBS_TO_KGS_RATIO = 0.45359237; // 1 pound = 0.45359237 kilograms
 const KGS_TO_LBS_RATIO = 2.2046226218; // 1 kilogram = 2.2046226218 pounds
-// Make these constants available outside this module for debugging
-window.LBS_TO_KGS_RATIO = LBS_TO_KGS_RATIO;
-window.KGS_TO_LBS_RATIO = KGS_TO_LBS_RATIO;
+// Add to window for debugging
+(window as any).LBS_TO_KGS_RATIO = LBS_TO_KGS_RATIO;
+(window as any).KGS_TO_LBS_RATIO = KGS_TO_LBS_RATIO;
 
 /**
  * Convert weight between LBS and KGS

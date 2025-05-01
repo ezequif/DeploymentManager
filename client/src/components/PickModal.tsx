@@ -123,9 +123,10 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/pallets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       const numQuantity = typeof quantity === 'string' ? 0 : quantity;
+      const displayQuantity = numQuantity.toFixed(1);
       toast({
         title: "Lot picked",
-        description: `Successfully picked ${numQuantity} ${lot.unit} from lot ${lot.lotNumber}`
+        description: `Successfully picked ${displayQuantity} LBS from lot ${lot.lotNumber}`
       });
       onClose();
     },
@@ -164,12 +165,11 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                       <ul className="list-disc ml-5 space-y-1">
                         {fifoCheck.olderLots.slice(0, 3).map((item, index) => (
                           <li key={index} className="font-bold">
-                            <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatWeightForDisplay(
-                              item.lot.quantity, 
-                              item.lot.unit as "KGS" | "LBS", 
-                              preferredUnit, 
-                              autoConvert
-                            )}
+                            <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {
+                              item.lot.unit === 'LBS' ? 
+                                `${item.lot.quantity.toFixed(1)} LBS` : 
+                                `${(item.lot.quantity * 2.2046226218).toFixed(1)} LBS`
+                            }
                           </li>
                         ))}
                         {fifoCheck.olderLots.length > 3 && (
@@ -196,12 +196,9 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                 <div className="text-sm font-medium text-gray-900">{lot.lotNumber}</div>
                 <div className="text-sm text-gray-500">Available:</div>
                 <div className="text-sm font-medium text-gray-900">
-                  {formatWeightForDisplay(
-                    lot.quantity, 
-                    lot.unit as "KGS" | "LBS", 
-                    preferredUnit, 
-                    autoConvert
-                  )}
+                  {lot.unit === 'LBS' ? 
+                    `${lot.quantity.toFixed(1)} LBS` : 
+                    `${(lot.quantity * 2.2046226218).toFixed(1)} LBS`}
                 </div>
                 <div className="text-sm text-gray-500">Expiration:</div>
                 <div className="text-sm font-medium text-gray-900">{formatDate(lot.expirationDate)}</div>
@@ -228,7 +225,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                       className="flex-1"
                     />
                     <span className="ml-2 text-gray-700 font-medium">
-                      {autoConvert ? preferredUnit : lot.unit}
+                      LBS
                     </span>
                   </div>
                   <Button 
