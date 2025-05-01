@@ -68,17 +68,26 @@ export default function PalletList() {
   // Use WebSocket data directly, and use a simple state flag to indicate loading
   const [isLoading, setIsLoading] = useState(true);
   
-  // Set loading to false once we get data
+  // Set loading to false once we get data or after a timeout
   useEffect(() => {
+    // If we get data, immediately set loading to false
     if (wsPallets.length > 0) {
       setIsLoading(false);
     }
+    
+    // Set a timeout to set loading to false after 2 seconds
+    // This ensures we don't show loading forever if there are no pallets
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+    
+    // Clean up the timeout on unmount
+    return () => clearTimeout(timer);
   }, [wsPallets]);
   
-  const pallets = useMemo(() => {
-    // Return pallets without excessive logging
-    return wsPallets.length > 0 ? wsPallets : [];
-  }, [wsPallets]);
+  // Simple useMemo to return the pallets array
+  // This will return the actual array from WebSocket, whether empty or not
+  const pallets = useMemo(() => wsPallets, [wsPallets]);
   
   // Cast pallets to the type with status property
   const typedPallets = pallets as PalletWithStatus[];
