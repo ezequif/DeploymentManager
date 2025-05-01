@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 import { normalizeDate } from "@/lib/formatUtils";
 import ScannerModal from "./ScannerModal";
 
@@ -27,6 +28,7 @@ export default function EditLotModal({ pallet, lot, isOpen, onClose }: EditLotMo
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   
   const { toast } = useToast();
+  const { preferredUnit } = useUnitSettings();
 
   // Using the imported normalizeDate function from formatUtils.ts
 
