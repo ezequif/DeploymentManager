@@ -12,10 +12,10 @@ type UnitContextType = {
 const UnitContext = createContext<UnitContextType | null>(null);
 
 export function UnitProvider({ children }: { children: ReactNode }) {
-  // Initialize from localStorage or use KGS as default
+  // Initialize from localStorage or use LBS as default
   const [preferredUnit, setPreferredUnit] = useState<UnitType>(() => {
     const savedUnit = localStorage.getItem("preferredUnit");
-    return (savedUnit as UnitType) || "KGS";
+    return (savedUnit as UnitType) || "LBS";
   });
   
   // Whether to automatically convert values when displaying them

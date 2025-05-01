@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUnitSettings } from "@/hooks/use-unit-settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, QrCode, RefreshCw } from "lucide-react";
 import ScannerModal from "./ScannerModal";
@@ -37,18 +38,21 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
   const [lotNumber, setLotNumber] = useState(existingLot?.lotNumber || "");
   const [quantity, setQuantity] = useState<number | null>(existingLot?.quantity || null);
   const [unit, setUnit] = useState<"KGS" | "LBS">(
-    (existingLot?.unit as "KGS" | "LBS") || "KGS"
+    (existingLot?.unit as "KGS" | "LBS") || preferredUnit
   );
   const [expirationDate, setExpirationDate] = useState<string>(
     existingLot?.expirationDate || new Date().toISOString().split("T")[0]
   );
+  
+  // Import the unit settings
+  const { preferredUnit } = useUnitSettings();
   
   // For multi-lot mode
   const [lots, setLots] = useState<LotFormData[]>([
     {
       lotNumber: "",
       quantity: null,
-      unit: "KGS",
+      unit: preferredUnit,
       expirationDate: new Date().toISOString().split("T")[0]
     }
   ]);
@@ -63,7 +67,7 @@ export default function AddLotModal({ pallet, isOpen, onClose, existingLot }: Ad
     const newLot: LotFormData = {
       lotNumber: "",
       quantity: null,
-      unit: "KGS",
+      unit: preferredUnit,
       expirationDate: new Date().toISOString().split("T")[0]
     };
     setLots([...lots, newLot]);
