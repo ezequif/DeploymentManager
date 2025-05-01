@@ -210,9 +210,12 @@ export default function UnifiedScannerModal({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" aria-describedby="scanner-description">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <p id="scanner-description" className="text-sm text-muted-foreground">
+            Scan a barcode using your device's camera or enter the code manually.
+          </p>
         </DialogHeader>
         
         {renderScannerView()}
