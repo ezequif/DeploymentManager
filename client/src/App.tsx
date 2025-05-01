@@ -1,7 +1,7 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useState, useEffect } from "react";
 import NotFound from "@/pages/not-found";
@@ -10,10 +10,11 @@ import PalletList from "./pages/PalletList";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import ScanPalletModal from "./components/ScanPalletModal";
-import { WebSocketProvider } from "./lib/websocket";
+
 import { SimplifiedMobileUI } from "./components/SimplifiedUI";
 import { isTC70, getBrowserInfo } from "./lib/deviceDetection";
 import { UnitProvider } from "@/hooks/use-unit-settings";
+import { ScannerProvider } from "@/lib/scannerContext";
 
 function Router() {
   return (
@@ -30,8 +31,8 @@ function Router() {
 
 function App() {
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
-  const [isTC70Device, setIsTC70Device] = useState(false);
   const [forceStandardUI, setForceStandardUI] = useState(false);
+  const [isTC70Device, setIsTC70Device] = useState(false);
   
   useEffect(() => {
     // Check localStorage first to see if user has manually switched to standard UI
@@ -61,13 +62,13 @@ function App() {
     
     // Log device information for debugging
     console.log('Device detection:', { 
-      isTC70: deviceCheck,
-      forceStandardUI: forceStandardUI,
-      browserInfo: getBrowserInfo(),
-      windowDimensions: {
+      userAgent: navigator.userAgent,
+      dimensions: {
         width: window.innerWidth,
         height: window.innerHeight
-      }
+      },
+      isTC70: deviceCheck,
+      browserInfo: getBrowserInfo(),
     });
   }, []);
   
@@ -81,15 +82,14 @@ function App() {
   };
   
   // Create a global function to open the scan modal
+  // @ts-ignore - Adding global property to window
   window.openScanPalletModal = () => setIsScanModalOpen(true);
   
   return (
     <QueryClientProvider client={queryClient}>
-      <WebSocketProvider>
-        <UnitProvider>
+      <UnitProvider>
+        <ScannerProvider>
           <TooltipProvider>
-            <Toaster />
-            
             {isTC70Device && !forceStandardUI ? (
               // Render the simplified UI specifically optimized for TC70 devices
               <div className="h-screen bg-white">
@@ -106,8 +106,8 @@ function App() {
               onClose={() => setIsScanModalOpen(false)}
             />
           </TooltipProvider>
-        </UnitProvider>
-      </WebSocketProvider>
+        </ScannerProvider>
+      </UnitProvider>
     </QueryClientProvider>
   );
 }

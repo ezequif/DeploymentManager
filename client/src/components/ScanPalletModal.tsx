@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import ScannerModal from "./ScannerModal";
+import UnifiedScannerModal from "./UnifiedScannerModal";
 import PickModal from "./PickModal";
 import { printPalletLabel } from "@/lib/barcodeUtils";
 import { formatDate, formatDateTime, formatQuantity, isExpired, isExpiringSoon } from "@/lib/formatUtils";
@@ -404,7 +404,7 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
         </DialogContent>
       </Dialog>
       
-      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} />}
+      {isScannerOpen && <UnifiedScannerModal onClose={() => setIsScannerOpen(false)} onScan={handleScanResult} title="Scan Pallet Barcode" />}
       
       {/* Add PickModal for lot picking functionality */}
       {selectedLot && pallet && (
