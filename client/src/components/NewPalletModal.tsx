@@ -43,17 +43,19 @@ type LotFormValues = z.infer<typeof lotSchema>;
 
 export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps) {
   const [withInitialLots, setWithInitialLots] = useState(true);
+  const { preferredUnit, autoConvert } = useUnitSettings();
+  
+  // Initialize lots with the preferred unit
   const [lots, setLots] = useState<LotFormValues[]>([{
     lotNumber: '',
     quantity: 0,
-    unit: 'KGS',
+    unit: preferredUnit,
     expirationDate: new Date().toISOString().split('T')[0],
   }]);
   const [activeTab, setActiveTab] = useState("pallet-info");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanningForField, setScanningForField] = useState<{ index: number, field: 'lotNumber' | 'rmNumber' } | null>(null);
   const { toast } = useToast();
-  const { preferredUnit, autoConvert } = useUnitSettings();
   
   // Fetch new pallet ID
   type PalletIdResponse = { palletId: string };
@@ -117,6 +119,7 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   
   const createPallet = useMutation({
     mutationFn: async (values: FormValues) => {
+      // Create a new object to avoid modifying the original values
       const data = { ...values };
       
       // Add the lots into the request data
@@ -125,11 +128,20 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
         const validLots = lots.filter(lot => 
           lot.lotNumber && lot.quantity > 0 && lot.expirationDate
         );
-        data.initialLots = validLots;
+        
+        if (validLots.length > 0) {
+          console.log("Adding valid lots to request:", validLots);
+          data.initialLots = validLots;
+        } else {
+          console.log("No valid lots to add");
+          delete data.initialLots;
+        }
       } else {
+        console.log("Not adding lots to request");
         delete data.initialLots;
       }
       
+      console.log("Submitting pallet data:", data);
       return apiRequest("POST", "/api/pallets", data);
     },
     onSuccess: async (response) => {
@@ -169,7 +181,35 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   });
   
   const onSubmit = (values: FormValues) => {
-    createPallet.mutate(values);
+    if (withInitialLots && activeTab === "initial-lots") {
+      // Validate lots directly before submitting
+      const validLots = lots.filter(lot => 
+        lot.lotNumber && lot.quantity > 0 && lot.expirationDate
+      );
+      
+      if (validLots.length === 0) {
+        toast({
+          title: "Missing lot information",
+          description: "Please provide valid lot information or disable the 'Add initial lots' option",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Clone form values and add the lots
+      const submitData = {
+        ...values,
+        initialLots: validLots
+      };
+      console.log("Submitting with lots:", submitData);
+      createPallet.mutate(submitData);
+    } else {
+      // Submit without lots
+      const submitData = { ...values };
+      delete submitData.initialLots;
+      console.log("Submitting without lots:", submitData);
+      createPallet.mutate(submitData);
+    }
   };
   
   return (
