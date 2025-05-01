@@ -1,0 +1,205 @@
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from '@/lib/websocket';
+import Papa from 'papaparse';
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FileDown, Check, FileWarning, FileText } from "lucide-react";
+import { type PalletWithLots, type Lot } from "@shared/schema";
+
+// Function to format data for CSV export
+function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lots' | 'full_inventory'): any[] {
+  switch (exportType) {
+    case 'pallets':
+      // Just pallet data
+      return pallets.map(pallet => ({
+        palletId: pallet.palletId,
+        rmNumber: pallet.rmNumber,
+        location: pallet.location,
+        notes: pallet.notes || '',
+        createdAt: new Date(pallet.createdAt).toISOString().split('T')[0],
+      }));
+    
+    case 'lots':
+      // Flatten to get all lots with their pallet IDs
+      return pallets.flatMap(pallet => 
+        pallet.lots.map(lot => ({
+          palletId: pallet.palletId,
+          lotNumber: lot.lotNumber,
+          quantity: lot.quantity,
+          unit: lot.unit,
+          expirationDate: new Date(lot.expirationDate).toISOString().split('T')[0],
+          createdAt: new Date(lot.createdAt).toISOString().split('T')[0],
+        }))
+      );
+    
+    case 'full_inventory':
+      // Full inventory format (palletId,rmNumber,location,lotNumber,quantity,unit,expirationDate)
+      return pallets.flatMap(pallet => 
+        pallet.lots.map(lot => ({
+          palletId: pallet.palletId,
+          rmNumber: pallet.rmNumber,
+          location: pallet.location,
+          lotNumber: lot.lotNumber,
+          quantity: lot.quantity,
+          unit: lot.unit,
+          expirationDate: new Date(lot.expirationDate).toISOString().split('T')[0],
+        }))
+      );
+    
+    default:
+      return [];
+  }
+}
+
+export function ExportCSV() {
+  const [isExporting, setIsExporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { pallets } = useWebSocket();
+  
+  const handleExport = async (exportType: 'pallets' | 'lots' | 'full_inventory') => {
+    try {
+      setIsExporting(true);
+      setProgress(10);
+      setError(null);
+      
+      if (!pallets || pallets.length === 0) {
+        throw new Error('No data available to export');
+      }
+      
+      setProgress(30);
+      
+      // Format the data based on the export type
+      const dataToExport = formatDataForCSV(pallets, exportType);
+      
+      if (dataToExport.length === 0) {
+        throw new Error('No data available for the selected export type');
+      }
+      
+      setProgress(50);
+      
+      // Convert to CSV
+      const csv = Papa.unparse(dataToExport);
+      
+      setProgress(75);
+      
+      // Create and download the file
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Set appropriate filename based on export type
+      const date = new Date().toISOString().split('T')[0];
+      let filename = '';
+      
+      if (exportType === 'pallets') {
+        filename = `pallets_export_${date}.csv`;
+      } else if (exportType === 'lots') {
+        filename = `lots_export_${date}.csv`;
+      } else if (exportType === 'full_inventory') {
+        filename = `inventory_export_${date}.csv`;
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setProgress(100);
+      
+      toast({
+        title: 'Export Successful',
+        description: `Exported ${dataToExport.length} records to ${filename}`,
+        variant: 'default',
+      });
+      
+    } catch (err: any) {
+      setProgress(100);
+      setError(err.message || 'An unexpected error occurred during export');
+      
+      toast({
+        title: 'Export Failed',
+        description: err.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      // Keep error visible but allow new exports
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 1000);
+    }
+  };
+  
+  return (
+    <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <div className="flex items-start gap-3">
+            <FileWarning className="h-5 w-5" />
+            <div className="space-y-1">
+              <AlertTitle>Export Failed</AlertTitle>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </div>
+          </div>
+        </Alert>
+      )}
+      
+      {isExporting && (
+        <Progress value={progress} className="h-2" />
+      )}
+      
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Export Data</h3>
+        
+        <Alert>
+          <FileText className="h-4 w-4" />
+          <AlertTitle>Export Options</AlertTitle>
+          <AlertDescription className="text-sm">
+            Choose the type of data you want to export. The exported CSV can be imported back into the system or used for reporting.
+          </AlertDescription>
+        </Alert>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => handleExport('pallets')}
+            disabled={isExporting}
+            className="flex gap-2 items-center"
+          >
+            <FileDown className="h-4 w-4" />
+            Export Pallets
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => handleExport('lots')}
+            disabled={isExporting}
+            className="flex gap-2 items-center"
+          >
+            <FileDown className="h-4 w-4" />
+            Export Lots
+          </Button>
+          
+          <Button 
+            variant="outline"
+            onClick={() => handleExport('full_inventory')}
+            disabled={isExporting}
+            className="flex gap-2 items-center text-primary"
+          >
+            <FileDown className="h-4 w-4" />
+            Export Full Inventory
+          </Button>
+        </div>
+        
+        <p className="text-sm text-gray-500 mt-2">
+          The "Full Inventory" export includes all data in import-ready format with the following columns: palletId, rmNumber, location, lotNumber, quantity, unit, expirationDate
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImportCSV } from "@/components/ImportCSV";
+import { ExportCSV } from "@/components/ExportCSV";
 import { useUnitSettings } from "@/hooks/use-unit-settings";
 
 export default function Settings() {
@@ -33,9 +34,10 @@ export default function Settings() {
   return (
     <div className="mt-6 space-y-6">
       <Tabs defaultValue="preferences" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="import">Data Import</TabsTrigger>
+          <TabsTrigger value="export">Data Export</TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
         </TabsList>
         
@@ -162,6 +164,17 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <ImportCSV />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="export" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Export</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExportCSV />
             </CardContent>
           </Card>
         </TabsContent>
