@@ -60,8 +60,11 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const syncData = useCallback(() => {
     let canUseWebSocket = false;
     
-    // Check if we have a valid WebSocket connection
-    if (socket && 'readyState' in socket && 'send' in socket) {
+    // In preview environment, always use REST API fallback for reliability
+    const isPreviewEnv = window.location.hostname.includes('replit.dev');
+    
+    // Check if we have a valid WebSocket connection and it's not a preview environment
+    if (!isPreviewEnv && socket && 'readyState' in socket && 'send' in socket) {
       const ws = socket as WebSocket;
       if (ws.readyState === WebSocket.OPEN) {
         try {
@@ -75,19 +78,20 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       }
     }
     
-    // If we couldn't use WebSocket, fall back to REST API
+    // If we couldn't use WebSocket or we're in preview, fall back to REST API
     if (!canUseWebSocket) {
-      console.log('Cannot sync via WebSocket - using REST API fallback');
+      console.log('Using REST API fallback for data sync');
       
       // Try to reload data via REST API as a fallback - silently
       // Construct URL that works in both preview and deployed environments
       let apiUrl = '/api/pallets'; // Relative URL is more reliable across environments
           
-      // If we're in a Replit preview and location origin doesn't include the proper base path
-      if (window.location.hostname.includes('replit.dev') && 
-          window.location.pathname !== '/' && 
-          !window.location.pathname.startsWith('/api')) {
-        // For Replit preview, use the full origin plus the relative path
+      // In preview environment, always use a full URL for maximum reliability
+      if (isPreviewEnv) {
+        // For Replit preview, always use the full origin for API calls
+        apiUrl = `${window.location.origin}/api/pallets`;
+        
+        // If we're in a deep path in preview
         // Get the base directory path from the current location
         const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
         if (basePath) {
@@ -137,11 +141,19 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           });
         });
     }
-  }, [socket, toast]);
+  }, [socket, toast, setPallets, setConnected, setLastSync]);
 
   useEffect(() => {
     // Log device info on startup for debugging
     console.log('Device info:', getBrowserInfo());
+    
+    // In preview environment, immediately use REST API to load data
+    // This ensures users see data right away without waiting for WebSocket
+    if (window.location.hostname.includes('replit.dev')) {
+      console.log('Preview environment detected, immediately loading data via REST API');
+      // Immediate data load via REST API
+      setTimeout(syncData, 100);
+    }
     
     // For TC70 devices, we use REST API polling instead of WebSockets
     if (isTC70()) {
@@ -652,7 +664,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         }
       }
     };
-  }, [toast, connected]);
+  }, [toast, connected, syncData]);
 
   return (
     <WebSocketContext.Provider value={{ 
