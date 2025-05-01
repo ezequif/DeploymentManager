@@ -28,8 +28,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create WebSocket server with security options
   const wss = new WebSocketServer({ 
-    server: httpServer, 
-    path: '/ws',
+    server: httpServer,
+    path: '/ws', // Specify '/ws' as the fixed path to avoid conflicts with Vite WebSocket
     // Additional security options
     clientTracking: true, // Track connected clients
     perMessageDeflate: {

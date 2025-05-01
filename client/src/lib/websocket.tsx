@@ -314,18 +314,17 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       // Determine appropriate WebSocket URL based on environment
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       
-      // Base WebSocket URL
+      // Base WebSocket URL with /ws path
       let wsUrl = `${protocol}//${window.location.host}/ws`;
       
-      // Check if we're in a Replit preview environment 
-      // Preview URLs typically have long complex paths that need special handling
+      // For Replit preview environment, handle potential path prefixing
       if (window.location.hostname.includes('replit.dev')) {
-        // Log the current URL for debugging
         console.log('Preview environment detected, adjusting WebSocket URL');
         console.log('Current location:', window.location.href);
         
         // For preview, handle potential path prefixing
-        if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/ws')) {
+        if (window.location.pathname !== '/' && 
+            !window.location.pathname.startsWith('/ws')) {
           // Try to handle the preview environment where front-end paths might be different
           const basePath = window.location.pathname.split('/').slice(0, -1).join('/');
           if (basePath) {
