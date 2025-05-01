@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CameraIcon, RotateCw, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Quagga from "@ericblade/quagga2";
 
 interface NativeCameraProps {
   onCapture: (data: string) => void;
@@ -25,6 +26,8 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
     // Cleanup function to stop camera when component unmounts
     return () => {
       stopCamera();
+      // Make sure to stop Quagga
+      Quagga.stop();
     };
   }, []);
 
@@ -40,67 +43,125 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
     }
   };
 
-  // Start camera with the current selected camera
+  // Start camera with Quagga barcode detection
   const startCamera = async () => {
     try {
-      // Stop any existing stream first
+      // Stop any existing stream and Quagga instance
       stopCamera();
+      Quagga.stop();
       
       // Get list of cameras first
       await getCameras();
       
       console.log("Starting camera with index:", currentCameraIndex);
       
-      // Try to select back camera for mobile devices
-      let constraints: MediaStreamConstraints = {
-        video: { 
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      };
-      
-      // If we have camera information and it's not the first time,
-      // use the selected camera's deviceId
+      // Configuration for device selection
+      let deviceId = undefined;
       if (availableCameras.length > 0 && currentCameraIndex < availableCameras.length) {
-        const selectedCamera = availableCameras[currentCameraIndex];
-        console.log("Selected camera:", selectedCamera.label);
-        
-        constraints = {
-          video: { 
-            deviceId: { exact: selectedCamera.deviceId },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        };
+        deviceId = availableCameras[currentCameraIndex].deviceId;
+        console.log("Selected camera:", availableCameras[currentCameraIndex].label);
       }
       
-      // Get user media with constraints
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Make sure video element exists
+      const videoElement = videoRef.current;
+      if (!videoElement) {
+        throw new Error("Video element not found");
+      }
       
-      // Set stream to video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setCameraStream(stream);
-        setError(null);
-        
-        // Log which camera is being used
-        if (stream.getVideoTracks().length > 0) {
-          console.log("Using camera:", stream.getVideoTracks()[0].label);
+      // Initialize Quagga with our configuration
+      await Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: videoElement,
+          constraints: {
+            facingMode: "environment",
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { min: 640 },
+            height: { min: 480 },
+            aspectRatio: { min: 1, max: 2 }
+          }
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: 2,
+        frequency: 10,
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "ean_reader",
+            "ean_8_reader",
+            "code_39_reader",
+            "code_93_reader",
+            "upc_reader",
+            "upc_e_reader",
+            "i2of5_reader"
+          ]
+        },
+        locate: true
+      });
+      
+      // Start Quagga
+      Quagga.start();
+      console.log("Quagga started");
+      
+      // Use Quagga's stream directly
+      try {
+        if (Quagga.CameraAccess) {
+          const track = Quagga.CameraAccess.getActiveTrack();
+          if (track) {
+            // Access the MediaStream directly - Quagga exposes this differently
+            // than the TypeScript definitions suggest
+            const stream = (track as any).getOriginalVideoTrack
+              ? (track as any).getOriginalVideoTrack().getMediaStream()
+              : new MediaStream([track]);
+              
+            setCameraStream(stream);
+            setError(null);
+            
+            toast({
+              title: "Scanner Ready",
+              description: "Position barcode in frame for automatic detection"
+            });
+          }
         }
-        
-        toast({
-          title: "Camera Ready",
-          description: "Position barcode in frame and press capture"
-        });
+      } catch (streamErr) {
+        console.error("Could not access camera stream:", streamErr);
+        // Just continue, we still have Quagga working
       }
+      
+      // Set up barcode detection handler
+      Quagga.onDetected((result) => {
+        if (result && result.codeResult && result.codeResult.code) {
+          console.log("Barcode detected:", result.codeResult.code);
+          // Only process if code is alphanumeric and reasonable length
+          if (/^[a-zA-Z0-9\-\_]{5,20}$/.test(result.codeResult.code)) {
+            // Stop scanning
+            Quagga.stop();
+            
+            // Signal successful scan with haptic feedback if available
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
+            
+            // Notify success
+            toast({
+              title: "Barcode Detected",
+              description: `${result.codeResult.code}`
+            });
+            
+            // Return the barcode value
+            onCapture(result.codeResult.code);
+          }
+        }
+      });
     } catch (err) {
-      console.error("Error starting camera:", err);
+      console.error("Error initializing camera/Quagga:", err);
       setError("Camera access failed. Please ensure camera permissions are granted.");
       toast({
-        title: "Camera Error",
+        title: "Scanner Error",
         description: "Could not access camera. Try manual entry.",
         variant: "destructive"
       });
@@ -135,7 +196,7 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
     }
   };
 
-  // Capture photo from camera
+  // Capture photo and process with Quagga
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current || !cameraStream) {
       toast({
@@ -163,21 +224,69 @@ export default function NativeCamera({ onCapture, onClose }: NativeCameraProps) 
       // Draw video frame to canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Get image data
-      const imageData = canvas.toDataURL("image/jpeg");
-      console.log("Image captured");
+      // Get image data for processing
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      console.log("Image captured for processing");
       
-      // For now, we just prompt for manual entry
-      // In a real implementation, we would process this image for barcode detection
+      // Notify user
       toast({
-        title: "Image Captured",
-        description: "Please enter barcode manually"
+        title: "Processing Image",
+        description: "Looking for barcodes..."
+      });
+      
+      // Process the image using Quagga
+      Quagga.decodeSingle({
+        src: canvas.toDataURL(),
+        numOfWorkers: 0,  // Use main thread
+        inputStream: {
+          size: Math.max(canvas.width, canvas.height)
+        },
+        decoder: {
+          // Enable multiple barcode formats for better results
+          readers: [
+            "code_128_reader", 
+            "ean_reader", 
+            "ean_8_reader", 
+            "code_39_reader", 
+            "code_93_reader", 
+            "upc_reader", 
+            "upc_e_reader", 
+            "i2of5_reader",
+            "2of5_reader",
+            "codabar_reader"
+          ]
+        },
+        locate: true
+      }, function(result) {
+        if (result && result.codeResult) {
+          console.log("Barcode detected in image:", result.codeResult.code);
+          
+          // Signal successful scan
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+          
+          toast({
+            title: "Barcode Found!",
+            description: result.codeResult.code
+          });
+          
+          // Return the detected barcode
+          onCapture(result.codeResult.code);
+        } else {
+          console.log("No barcode detected in image");
+          toast({
+            title: "No Barcode Found",
+            description: "Try again or enter manually",
+            variant: "destructive"
+          });
+        }
       });
     } catch (err) {
-      console.error("Error capturing photo:", err);
+      console.error("Error capturing/processing photo:", err);
       toast({
-        title: "Capture Failed",
-        description: "Could not take photo",
+        title: "Processing Failed",
+        description: "Could not process image",
         variant: "destructive"
       });
     }

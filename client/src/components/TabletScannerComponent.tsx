@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import Quagga from "@ericblade/quagga2";
+import { CameraIcon, RotateCw } from "lucide-react";
 
 interface TabletScannerProps {
   onCapture: (barcode: string) => void;
@@ -10,114 +12,173 @@ interface TabletScannerProps {
 export default function TabletScannerComponent({ onCapture, onClose }: TabletScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasStream, setHasStream] = useState(false);
+  const scannerRef = useRef<HTMLDivElement>(null);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const { toast } = useToast();
 
-  // Initialize the camera stream when component mounts
+  // Initialize scanning when component mounts
   useEffect(() => {
-    startCamera();
-    
-    // Clean up on unmount
+    // Cleanup function to stop Quagga when component unmounts
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+      if (scanning) {
+        Quagga.stop();
       }
     };
-  }, []);
+  }, [scanning]);
 
-  // Start the camera with simplified constraints
-  const startCamera = async () => {
+  // Start the Quagga scanner with simplified settings
+  const startScanner = async () => {
     try {
+      // Make sure the scanner container exists
+      if (!scannerRef.current) {
+        throw new Error("Scanner container not found");
+      }
+
       // Log device info
-      console.log("Starting TabletScannerComponent camera", {
+      console.log("Starting Quagga in TabletScannerComponent", {
         userAgent: navigator.userAgent,
         protocol: window.location.protocol,
         hostname: window.location.hostname
       });
       
-      // Most basic constraints possible
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false
+      // Stop if already scanning
+      if (scanning) {
+        Quagga.stop();
+      }
+      
+      // Configure and initialize Quagga with simplified settings
+      await Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerRef.current,
+          constraints: {
+            facingMode: "environment",
+            width: { min: 450 },
+            height: { min: 300 },
+            aspectRatio: { min: 1, max: 2 }
+          },
+          area: { // Only scan middle 80% of the detection area
+            top: "10%",
+            right: "10%",
+            left: "10%",
+            bottom: "10%"
+          }
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: navigator.hardwareConcurrency 
+          ? Math.min(navigator.hardwareConcurrency - 1, 4) 
+          : 1,
+        frequency: 10,
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "ean_reader",
+            "ean_8_reader",
+            "code_39_reader",
+            "code_93_reader",
+            "upc_reader",
+            "upc_e_reader",
+            "i2of5_reader"
+          ],
+          multiple: false
+        },
+        locate: true
       });
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setHasStream(true);
-        setError(null);
-        
-        // Log which camera is being used
-        const videoTrack = stream.getVideoTracks()[0];
-        console.log("Camera started:", videoTrack.label);
-        console.log("Camera settings:", videoTrack.getSettings());
-        
-        toast({
-          title: "Camera Ready",
-          description: "Position barcode in frame and tap capture button"
-        });
-      }
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      setError("Could not access camera. Please check permissions or try manual entry.");
+      // Start Quagga
+      Quagga.start();
+      setScanning(true);
+      console.log("Quagga scanner started");
+      
       toast({
-        title: "Camera Error",
-        description: "Could not access camera. Please use manual entry.",
+        title: "Scanner Active",
+        description: "Position barcode in view for scanning"
+      });
+      
+      // Set up barcode detection handler
+      Quagga.onDetected((result) => {
+        if (result && result.codeResult && result.codeResult.code) {
+          const code = result.codeResult.code;
+          console.log("Barcode detected:", code);
+          
+          // Validate the barcode (simple length check)
+          if (code.length >= 5 && code.length <= 30) {
+            // Stop scanning
+            Quagga.stop();
+            setScanning(false);
+            
+            // Provide haptic feedback if available
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
+            
+            // Notify success
+            toast({
+              title: "Barcode Detected!",
+              description: code
+            });
+            
+            // Return the barcode
+            onCapture(code);
+          }
+        }
+      });
+      
+      // Add debug info to show processed images
+      Quagga.onProcessed((result) => {
+        const drawingCtx = Quagga.canvas.ctx.overlay;
+        const drawingCanvas = Quagga.canvas.dom.overlay;
+        
+        if (result) {
+          if (result.boxes) {
+            drawingCtx.clearRect(
+              0, 0, parseInt(drawingCanvas.getAttribute("width") || "0"), 
+              parseInt(drawingCanvas.getAttribute("height") || "0")
+            );
+            result.boxes.filter(box => box !== result.box).forEach(box => {
+              drawingCtx.strokeStyle = "green";
+              drawingCtx.lineWidth = 2;
+              drawingCtx.strokeRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+            });
+          }
+          
+          if (result.box) {
+            drawingCtx.strokeStyle = "blue";
+            drawingCtx.lineWidth = 2;
+            drawingCtx.strokeRect(
+              result.box.x, result.box.y, 
+              result.box.width, result.box.height
+            );
+          }
+          
+          if (result.codeResult && result.codeResult.code) {
+            drawingCtx.font = "24px Arial";
+            drawingCtx.fillStyle = "green";
+            drawingCtx.fillText(result.codeResult.code, 10, 50);
+          }
+        }
+      });
+      
+    } catch (err) {
+      console.error("Error starting Quagga scanner:", err);
+      setError("Could not start barcode scanner. Please check permissions.");
+      setScanning(false);
+      
+      toast({
+        title: "Scanner Error",
+        description: "Could not start barcode scanner. Please use manual entry.",
         variant: "destructive"
       });
     }
   };
 
-  // Take a photo from the video stream
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current || !hasStream) {
-      toast({
-        title: "Cannot Capture",
-        description: "Camera not ready. Please try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw the current video frame to the canvas
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        throw new Error("Could not get canvas context");
-      }
-      
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // For now, we'll use manual entry since we don't have barcode detection
-      // In a real implementation, this is where you would process the image
-      toast({
-        title: "Photo Captured",
-        description: "Please enter the barcode manually"
-      });
-      
-      // Convert to data URL for debugging
-      const imageData = canvas.toDataURL("image/jpeg");
-      console.log("Image captured:", imageData.substring(0, 50) + "...");
-    } catch (err) {
-      console.error("Error capturing photo:", err);
-      toast({
-        title: "Capture Failed",
-        description: "Could not take photo. Please try manual entry.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Handle manual code submission
+  // Handle manual barcode submission
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) {
@@ -129,67 +190,73 @@ export default function TabletScannerComponent({ onCapture, onClose }: TabletSca
       return;
     }
     
+    // Return the manually entered barcode
     onCapture(manualCode);
-    toast({
-      title: "Code Accepted",
-      description: `Barcode: ${manualCode}`
-    });
   };
 
   return (
     <div className="flex flex-col w-full">
-      {/* Camera view */}
-      <div className="relative w-full h-[300px] bg-gray-100 rounded-lg overflow-hidden mb-4">
-        <video 
-          ref={videoRef}
-          className="w-full h-full object-cover"
-          autoPlay
-          playsInline
-          muted
-        />
+      {/* Scanner view */}
+      <div className="relative w-full h-[350px] bg-gray-900 rounded-lg overflow-hidden mb-4">
+        <div 
+          ref={scannerRef} 
+          className="absolute inset-0 w-full h-full"
+        >
+          {/* Quagga will inject video here */}
+          {!scanning && (
+            <div className="flex items-center justify-center h-full bg-gray-800 text-gray-300">
+              <div className="text-center p-4">
+                <CameraIcon className="mx-auto h-12 w-12 mb-2" />
+                <p>Press Start Scanner to begin</p>
+              </div>
+            </div>
+          )}
+        </div>
         
-        {/* Overlay for targeting */}
+        {/* Targeting guide */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-2/3 h-1/3 border-2 border-primary rounded-lg">
+          <div className="w-2/3 h-1/2 border-2 border-primary/50 border-dashed rounded-lg">
             <div className="text-white text-center text-sm bg-black/30 rounded p-1">
               Position barcode here
             </div>
           </div>
         </div>
         
-        {/* Corner markers */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-primary"></div>
-        <div className="absolute top-0 left-0 bottom-0 w-1 bg-primary"></div>
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>
-        <div className="absolute top-0 right-0 bottom-0 w-1 bg-primary"></div>
-        
         {/* Error message overlay */}
         {error && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4">
             <div className="bg-white p-4 rounded-lg max-w-xs">
-              <h3 className="font-medium text-red-500 mb-2">Camera Error</h3>
+              <h3 className="font-medium text-red-500 mb-2">Scanner Error</h3>
               <p className="text-sm">{error}</p>
+              <Button
+                onClick={() => setError(null)}
+                className="mt-2 w-full"
+                variant="outline"
+                size="sm"
+              >
+                Dismiss
+              </Button>
             </div>
           </div>
         )}
       </div>
       
-      {/* Hidden canvas for image processing */}
-      <canvas ref={canvasRef} className="hidden"></canvas>
-      
       {/* Controls */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Button
-          onClick={capturePhoto}
+          onClick={scanning ? () => {
+            Quagga.stop();
+            setScanning(false);
+          } : startScanner}
           className="w-full py-6 text-lg"
-          disabled={!hasStream}
+          variant={scanning ? "destructive" : "default"}
         >
-          Capture Photo
+          {scanning ? "Stop Scanner" : "Start Scanner"}
         </Button>
         <Button
           onClick={onClose}
           variant="outline"
-          className="w-full"
+          className="w-full py-6"
         >
           Cancel
         </Button>
