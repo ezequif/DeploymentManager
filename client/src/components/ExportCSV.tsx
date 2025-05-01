@@ -17,7 +17,7 @@ function formatDataForCSV(pallets: PalletWithLots[], exportType: 'pallets' | 'lo
         palletId: pallet.palletId,
         rmNumber: pallet.rmNumber,
         location: pallet.location,
-        status: pallet.status,
+        status: pallet.status.toString(),
         createdAt: new Date(pallet.createdAt).toISOString().split('T')[0],
       }));
     
