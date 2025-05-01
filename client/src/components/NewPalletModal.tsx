@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -57,13 +57,6 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
   const [scanningForField, setScanningForField] = useState<{ index: number, field: 'lotNumber' | 'rmNumber' } | null>(null);
   const { toast } = useToast();
   
-  // Fetch new pallet ID
-  type PalletIdResponse = { palletId: string };
-  const { data: palletIdData } = useQuery<PalletIdResponse>({
-    queryKey: ['/api/pallets/generate-id'],
-    enabled: isOpen,
-  });
-  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -73,6 +66,42 @@ export default function NewPalletModal({ isOpen, onClose }: NewPalletModalProps)
       initialLots: [],
     },
   });
+  
+  // Fetch new pallet ID
+  type PalletIdResponse = { palletId: string };
+  const { data: palletIdData, refetch: refetchPalletId } = useQuery<PalletIdResponse>({
+    queryKey: ['/api/pallets/generate-id', isOpen], // Adding isOpen to the query key to force refetch
+    enabled: isOpen,
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Consider the data immediately stale
+  });
+  
+  // Refetch pallet ID and reset form when modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      // Reset form and state
+      form.reset({
+        palletId: '',
+        rmNumber: '',
+        location: '',
+        initialLots: [],
+      });
+      
+      // Reset lots
+      setLots([{
+        lotNumber: '',
+        quantity: 0,
+        unit: preferredUnit,
+        expirationDate: new Date().toISOString().split('T')[0],
+      }]);
+      
+      // Set default tab
+      setActiveTab("pallet-info");
+      
+      // Fetch a new pallet ID
+      refetchPalletId();
+    }
+  }, [isOpen, refetchPalletId, form, preferredUnit]);
   
   // Update form with generated pallet ID when available
   if (palletIdData?.palletId && !form.getValues().palletId) {
