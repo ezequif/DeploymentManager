@@ -198,32 +198,17 @@ function PalletItem({ pallet, onClick }: { pallet: PalletWithLots; onClick: () =
   
   // Calculate total quantity with unit conversion if needed
   let totalQuantity = 0;
-  let displayUnit = preferredUnit;
   
   if (pallet.lots.length > 0) {
-    // If all lots have the same unit, use that unit for display
-    const firstLotUnit = pallet.lots[0].unit;
-    const allSameUnit = pallet.lots.every(lot => lot.unit === firstLotUnit);
-    
-    if (allSameUnit) {
-      displayUnit = firstLotUnit;
-      totalQuantity = pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0);
-    } else if (autoConvert) {
-      // Convert all to preferred unit if autoConvert is enabled
-      totalQuantity = pallet.lots.reduce((sum, lot) => {
-        if (lot.unit === preferredUnit) {
-          return sum + lot.quantity;
-        } else {
-          // Convert from KGS to LBS or vice versa
-          const conversionFactor = lot.unit === 'KGS' ? 2.20462 : 0.453592;
-          return sum + (lot.quantity * conversionFactor);
-        }
-      }, 0);
-    } else {
-      // If units are mixed and autoConvert is disabled, just sum them up
-      // This is not ideal but keeps the logic simple
-      totalQuantity = pallet.lots.reduce((sum, lot) => sum + lot.quantity, 0);
-    }
+    // Always convert to LBS
+    totalQuantity = pallet.lots.reduce((sum, lot) => {
+      if (lot.unit === 'LBS') {
+        return sum + lot.quantity;
+      } else {
+        // Convert from KGS to LBS
+        return sum + (lot.quantity * 2.2046226218);
+      }
+    }, 0);
   }
   
   return (
@@ -238,7 +223,7 @@ function PalletItem({ pallet, onClick }: { pallet: PalletWithLots; onClick: () =
       <div className="text-sm truncate">RM# {pallet.rmNumber}</div>
       <div className="text-sm truncate">Location: {pallet.location}</div>
       <div className="text-sm font-medium">
-        {totalQuantity > 0 ? `Total: ${formatQuantity(totalQuantity)} ${displayUnit}` : 'Empty'}
+        {totalQuantity > 0 ? `Total: ${formatQuantity(totalQuantity)} LBS` : 'Empty'}
       </div>
     </button>
   );
@@ -252,7 +237,9 @@ function LotItem({ lot }: { lot: Lot }) {
       <div className="flex justify-between">
         <span className="font-bold">{lot.lotNumber}</span>
         <span className="font-medium">
-          {formatWeightForDisplay(lot.quantity, lot.unit, preferredUnit, autoConvert)}
+          {lot.unit === 'LBS' ? 
+            `${lot.quantity.toFixed(1)} LBS` : 
+            `${(lot.quantity * 2.2046226218).toFixed(1)} LBS`}
         </span>
       </div>
       <div className="text-sm">Expires: {formatDate(lot.expirationDate)}</div>
