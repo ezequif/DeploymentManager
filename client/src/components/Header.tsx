@@ -144,15 +144,23 @@ export default function Header() {
                 >
                   <User className="h-5 w-5 mr-1" />
                   <span className="hidden sm:inline text-sm">
-                    {user.firstName || user.username}
+                    {(user.firstName || 
+                     user.username || 
+                     (user.id ? 'Admin' : 'User'))}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
-                    <span>{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username}</span>
-                    <span className="text-xs text-muted-foreground">{user.role}</span>
+                    <span>
+                      {user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}` 
+                        : (user.username || (user.id ? 'Admin' : 'User'))}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {user.role || 'admin'}
+                    </span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
