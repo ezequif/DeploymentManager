@@ -38,14 +38,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { userRoleSchema } from "@shared/schema";
-import type { User } from "@shared/schema";
+// No need to import User type as we define it directly
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Edit, MoreHorizontal, UserPlus, Loader2, ShieldCheck, UserX } from "lucide-react";
 import { useLocation } from "wouter";
 
 // Type for users data without the password field
+type User = {
+  id: number;
+  username: string;
+  role: "admin" | "manager" | "operator" | "viewer";
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  active: boolean;
+  createdAt: string;
+  lastLogin: string | null;
+};
+
 type UserWithoutPassword = Omit<User, "password">;
 
 // Schema for creating a new user

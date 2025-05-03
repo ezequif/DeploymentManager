@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema, userRoleSchema } from "@shared/schema";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -21,11 +20,17 @@ const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-// Create a registration schema that extends the user schema
-const registerSchema = insertUserSchema.extend({
+// Create a registration schema with validation
+const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
+  email: z.string().email("Invalid email address").optional().nullable(),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  role: z.enum(["admin", "manager", "operator", "viewer"]).default("viewer"),
+  active: z.boolean().default(true)
+}).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
@@ -35,13 +40,23 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [tab, setTab] = useState<"login" | "register">("login");
-  const { loginMutation, registerMutation, user } = useAuth();
+  const { loginMutation, registerMutation, user, isLoading } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   
-  // If user is already logged in, redirect to home page
-  if (user) {
-    navigate("/");
+  // Check if there's a token in localStorage - this helps prevent flashing of auth page
+  const token = localStorage.getItem("auth_token");
+  
+  // Use useEffect for navigation to avoid React warnings about setState during render
+  useEffect(() => {
+    // If user is already logged in, or there's a token and we're still loading, don't show login page
+    if (user || (token && isLoading)) {
+      navigate("/");
+    }
+  }, [user, navigate, token, isLoading]);
+  
+  // Don't render anything while checking authentication
+  if (user || (token && isLoading)) {
     return null;
   }
 

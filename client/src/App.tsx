@@ -24,10 +24,10 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <ProtectedRoute path="/" component={PalletList} />
-        <ProtectedRoute path="/history" component={History} />
-        <ProtectedRoute path="/settings" component={Settings} />
-        <ProtectedRoute path="/users" component={UserManagement} />
+        <ProtectedRoute path="/" component={() => <PalletList />} />
+        <ProtectedRoute path="/history" component={() => <History />} />
+        <ProtectedRoute path="/settings" component={() => <Settings />} />
+        <ProtectedRoute path="/users" component={() => <UserManagement />} />
         <Route path="/auth" component={AuthPage} />
         <Route component={NotFound} />
       </Switch>
