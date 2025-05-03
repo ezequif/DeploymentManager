@@ -2,105 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, Rea
 import { PalletWithLots } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 import { isTC70, isLowPowerDevice, hasWebSocketSupport, getBrowserInfo } from './deviceDetection';
-
-// Singleton WebSocket instance that persists across page navigations
-let globalWsInstance: WebSocket | null = null;
-let globalClientId: string | null = null;
-let messageListeners: Array<(message: any) => void> = [];
-let reconnectAttempt = 0;
-let reconnectTimeout: NodeJS.Timeout | null = null;
-
-// Function to create or get the singleton WebSocket instance
-function getOrCreateWebSocket(): WebSocket | null {
-  if (globalWsInstance && (globalWsInstance.readyState === WebSocket.OPEN || globalWsInstance.readyState === WebSocket.CONNECTING)) {
-    console.log("Reusing existing WebSocket connection");
-    return globalWsInstance;
-  }
-  
-  // If we don't have WebSocket support, return null
-  if (!hasWebSocketSupport()) {
-    console.log("WebSocket not supported on this device");
-    return null;
-  }
-  
-  try {
-    // Create a new WebSocket connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    console.log("Creating new WebSocket connection to", wsUrl);
-    
-    globalWsInstance = new WebSocket(wsUrl);
-    
-    // Set up event handlers on the global instance
-    globalWsInstance.onopen = () => {
-      console.log("Global WebSocket connected");
-      reconnectAttempt = 0;
-      
-      // Clear any pending reconnect timeouts
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-      }
-    };
-    
-    globalWsInstance.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        // Store client ID if it's in an init message
-        if (message.type === 'init' && message.data.clientId) {
-          globalClientId = message.data.clientId;
-        }
-        
-        // Broadcast message to all listeners
-        messageListeners.forEach(listener => {
-          try {
-            listener(message);
-          } catch (error) {
-            console.error("Error in message listener:", error);
-          }
-        });
-      } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
-      }
-    };
-    
-    globalWsInstance.onclose = (event) => {
-      console.log("Global WebSocket closed with code:", event.code);
-      
-      // Only try to reconnect for abnormal closures
-      if (event.code !== 1000 && event.code !== 1001) {
-        // Calculate reconnect delay with exponential backoff
-        const maxDelay = isLowPowerDevice() ? 30000 : 10000;
-        const delay = Math.min(maxDelay, 1000 * Math.pow(1.5, reconnectAttempt));
-        
-        console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempt + 1})`);
-        
-        // Schedule reconnection
-        reconnectTimeout = setTimeout(() => {
-          reconnectAttempt++;
-          globalWsInstance = null; // Clear the instance so we create a new one
-          getOrCreateWebSocket();
-        }, delay);
-      }
-    };
-    
-    globalWsInstance.onerror = (error) => {
-      console.error("Global WebSocket error:", error);
-    };
-    
-    return globalWsInstance;
-  } catch (error) {
-    console.error("Error creating WebSocket:", error);
-    return null;
-  }
-}
-
-// Create aliasing for compatibility with existing code
-let globalListeners = messageListeners;
-
-// Flag for was connected state
-let wasConnectedBefore = false;
+import WebSocketService, { MessageHandler } from './websocketService';
 
 // Type for pending operations that will be stored when offline
 export type PendingOperation = {
@@ -144,16 +46,12 @@ type WebSocketProviderProps = {
   children: ReactNode;
 };
 
+type PollingConnection = {
+  pollInterval: NodeJS.Timeout;
+  cleanup: () => void;
+};
+
 export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
-  // Define a type for our polling connection return object
-  type PollingConnection = {
-    pollInterval: NodeJS.Timeout;
-    cleanup: () => void;
-  };
-  
-  // Socket can be either a WebSocket or our polling connection object
-  type WSConnection = WebSocket | PollingConnection | null;
-  const [socket, setSocket] = useState<WSConnection>(null);
   const [connected, setConnected] = useState(false);
   const [pallets, setPallets] = useState<PalletWithLots[]>([]);
   const [userCount, setUserCount] = useState(0);
@@ -162,28 +60,22 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [pendingOperations, setPendingOperations] = useState<PendingOperation[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline' | 'limited'>(
-    navigator.onLine ? (connected ? 'online' : 'limited') : 'offline'
+    navigator.onLine ? 'limited' : 'offline'
   );
   
-  // Used for reconnection tracking
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 10;
+  // Track polling interval for TC70 and WebSocket-unsupported devices
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track last sync request time to prevent too frequent syncs
+  const lastSyncRequestRef = useRef<number>(0);
+  const MIN_SYNC_INTERVAL = 3000; // Minimum time between sync requests (3 seconds)
+  
   const { toast } = useToast();
   
   // Function to request the list of connected clients
   const getConnectedClients = useCallback(() => {
-    if (socket && 'readyState' in socket && 'send' in socket) {
-      const ws = socket as WebSocket;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'getConnectedClients' }));
-      }
-    }
-  }, [socket]);
-  
-  // Track last sync request time to prevent too frequent syncs
-  const lastSyncRequestRef = useRef<number>(0);
-  // Minimum time between sync requests (3 seconds)
-  const MIN_SYNC_INTERVAL = 3000;
+    WebSocketService.sendMessage('getConnectedClients');
+  }, []);
   
   // Function to request a full data sync from the server
   const syncData = useCallback(() => {
@@ -197,91 +89,70 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     // Update the last sync request time
     lastSyncRequestRef.current = now;
     
-    let canUseWebSocket = false;
-    
-    // Check if we have a valid WebSocket connection
-    if (socket && 'readyState' in socket && 'send' in socket) {
-      const ws = socket as WebSocket;
-      if (ws.readyState === WebSocket.OPEN) {
-        // Silent sync - Tell the server to send us a full data refresh without toast notifications
-        ws.send(JSON.stringify({ type: 'requestSync' }));
-        canUseWebSocket = true;
-      }
+    // Try WebSocket first
+    if (WebSocketService.getStatus() === 'open') {
+      WebSocketService.requestSync();
+      return;
     }
     
-    // If we couldn't use WebSocket, fall back to REST API
-    if (!canUseWebSocket) {
-      console.log('Cannot sync via WebSocket - using REST API fallback');
-      
-      // Try to reload data via REST API as a fallback - silently
-      const apiUrl = `${window.location.origin}/api/pallets`;
-      console.log(`Fetching from: ${apiUrl}`);
-      
-      // Get the auth token from localStorage
-      const token = localStorage.getItem("auth_token");
-      
-      // Setup headers with auth token if it exists
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store'
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      fetch(apiUrl, {
-        method: 'GET',
-        headers: headers,
-        credentials: 'include'
+    // Fall back to REST API if WebSocket is not available
+    console.log('Cannot sync via WebSocket - using REST API fallback');
+    
+    // Get the auth token from localStorage
+    const token = localStorage.getItem("auth_token");
+    
+    // Setup headers with auth token if it exists
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache, no-store'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    fetch(`${window.location.origin}/api/pallets`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Server responded with status: ${res.status}`);
+        }
+        return res.json();
       })
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`Server responded with status: ${res.status}`);
+      .then(data => {
+        if (Array.isArray(data)) {
+          console.log(`Manual sync successful, received ${data.length} pallets`);
+          setPallets(data);
+          setLastSync(new Date());
+          setConnected(true);
+        } else {
+          console.error('Invalid data format received:', data);
+          if (data && typeof data === 'object') {
+            setPallets(data.pallets || []);
           }
-          return res.json();
-        })
-        .then(data => {
-          if (Array.isArray(data)) {
-            // Only log if data changed
-            const prevPalletCount = pallets.length;
-            if (prevPalletCount !== data.length) {
-              console.log(`Manual sync successful, received ${data.length} pallets (previously had ${prevPalletCount})`);
-            } else {
-              console.log(`Manual sync completed - no data changes detected`);
-            }
-            
-            setPallets(data);
-            setLastSync(new Date());
-            setConnected(true);
-          } else {
-            console.error('Invalid data format received:', data);
-            // Still store if it's not an array but valid
-            if (data && typeof data === 'object') {
-              setPallets(data.pallets || []);
-            }
-          }
-        })
-        .catch(error => {
-          console.error('Failed to fetch pallets:', error);
-          setConnected(false);
-          // Only show a toast on error
-          toast({
-            title: "Sync Failed",
-            description: "Could not fetch data. Check your connection.",
-            variant: "destructive"
-          });
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch pallets:', error);
+        setConnected(false);
+        toast({
+          title: "Sync Failed",
+          description: "Could not fetch data. Check your connection.",
+          variant: "destructive"
         });
-    }
-  }, [socket, toast, pallets.length]);
-
+      });
+  }, [toast]);
+  
   // Update the connection status when connected or online state changes
   useEffect(() => {
     if (!isOnline) {
       setConnectionStatus('offline');
     } else if (connected) {
       setConnectionStatus('online');
-      // Try to process any pending operations when connection is restored
+      // Process any pending operations when connection is restored
       if (pendingOperations.length > 0) {
         processPendingOperations();
       }
@@ -289,7 +160,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       setConnectionStatus('limited');
     }
   }, [isOnline, connected, pendingOperations]);
-
+  
   // Track online/offline status
   useEffect(() => {
     const handleOnline = () => {
@@ -298,7 +169,6 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         title: "Back Online",
         description: "Your internet connection has been restored.",
       });
-      // Trigger a data sync
       syncData();
     };
     
@@ -375,492 +245,419 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     // After processing operations, force a full sync to ensure consistency
     syncData();
   }, [pendingOperations, isOnline, syncData, toast]);
+  
+  // Set up polling for TC70 devices or devices without WebSocket support
+  const setupPolling = useCallback(() => {
+    // Clear any existing polling interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    
+    const pollData = (retryAttempt = 0) => {
+      console.log(`Polling data (attempt: ${retryAttempt})`);
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem("auth_token");
+      
+      // Setup headers with auth token if it exists
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      fetch(`${window.location.origin}/api/pallets`, {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include',
+        cache: 'no-store' // Prevent caching issues
+      })
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Server responded with status: ${res.status}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            console.log(`Poll successful, received ${data.length} pallets`);
+            setPallets(data);
+            setLastSync(new Date());
+            setConnected(true);
+          } else {
+            console.error('Invalid data format received:', data);
+            if (data && typeof data === 'object') {
+              setPallets(data.pallets || []);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Failed to poll data:', error);
+          setConnected(false);
+          
+          // Retry with exponential backoff
+          if (retryAttempt < 5) {
+            const delay = Math.min(30000, 1000 * Math.pow(2, retryAttempt));
+            console.log(`Will retry in ${delay}ms`);
+            setTimeout(() => pollData(retryAttempt + 1), delay);
+          }
+        });
+    };
+    
+    // Initial poll
+    pollData();
+    
+    // Set up regular polling (every 15 seconds)
+    pollingIntervalRef.current = setInterval(() => pollData(), 15000);
+    
+    // Return cleanup function
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Handle WebSocket messages
+  const handleWebSocketMessage: MessageHandler = useCallback((message) => {
+    try {
+      switch (message.type) {
+        case 'init':
+          // Silent data loading - reduces console spam
+          setPallets(message.data.pallets);
+          setUserCount(message.data.connectedUsers);
+          setLastSync(new Date());
+          
+          // Save client ID
+          if (message.data.clientId) {
+            setClientId(message.data.clientId);
+          }
+          
+          // Show a toast if this is a data sync event (not the initial connection)
+          if (connected) {
+            toast({
+              title: "Data Synchronized",
+              description: `${message.data.pallets.length} pallets loaded from server.`,
+            });
+          }
+          break;
+          
+        case 'userCount':
+          // Update the number of connected users
+          setUserCount(message.data);
+          break;
+          
+        case 'palletCreated':
+          // Add the new pallet to the state
+          setPallets(prev => [...prev, message.data]);
+          toast({
+            title: "New Pallet Added",
+            description: `Pallet ${message.data.palletId} has been added.`,
+          });
+          break;
+          
+        case 'palletUpdated':
+          // Update the modified pallet in the state
+          setPallets(prev => 
+            prev.map(p => p.id === message.data.id ? message.data : p)
+          );
+          toast({
+            title: "Pallet Updated",
+            description: `Pallet ${message.data.palletId} has been updated.`,
+          });
+          break;
+          
+        case 'palletArchived':
+          // Update the archived pallet in the state
+          setPallets(prev => 
+            prev.map(p => p.id === message.data.id ? message.data : p)
+          );
+          toast({
+            title: "Pallet Archived",
+            description: `Pallet ${message.data.palletId} has been archived.`,
+          });
+          break;
+          
+        case 'lotCreated':
+          // Update the pallet that contains the new lot
+          setPallets(prev => 
+            prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
+          );
+          toast({
+            title: "Lot Added",
+            description: `Lot added to pallet ${message.data.pallet.palletId}.`,
+          });
+          break;
+          
+        case 'lotUpdated':
+          setPallets(prev => 
+            prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
+          );
+          break;
+          
+        case 'lotDeleted':
+          setPallets(prev => 
+            prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
+          );
+          toast({
+            title: 'Lot Removed',
+            description: `Lot has been removed.`,
+          });
+          break;
+          
+        case 'palletDeleted':
+          setPallets(prev => prev.filter(p => p.id !== message.data.id));
+          toast({
+            title: 'Pallet Deleted',
+            description: `Pallet ${message.data.palletId} has been permanently deleted.`,
+            variant: 'destructive'
+          });
+          break;
+          
+        case 'transactionDeleted':
+          // We don't store transactions in state, but toast a notification
+          toast({
+            title: 'Transaction Deleted',
+            description: `Transaction has been removed from history.`,
+          });
+          break;
+          
+        case 'notification':
+          toast({
+            title: message.data.title,
+            description: message.data.description,
+          });
+          break;
 
+        case 'fullSync':
+          // Handle automatic server-initiated data sync (every 60s)
+          // Silent data sync - no console logging
+          
+          // Compare pallets to detect changes
+          const currentPalletIds = new Set(pallets.map((p: PalletWithLots) => p.id));
+          const newPalletIds = new Set(message.data.pallets.map((p: PalletWithLots) => p.id));
+          
+          // Check for new pallets
+          const newPallets = message.data.pallets.filter((p: PalletWithLots) => !currentPalletIds.has(p.id));
+          
+          // Check for removed pallets (active ones, not archived)
+          const removedPallets = pallets.filter((p: PalletWithLots) => 
+            !newPalletIds.has(p.id) && p.status === 'active'
+          );
+          
+          // Track lots that have changed quantities
+          type LotUpdate = {
+            palletId: string;
+            lotNumber: string;
+            oldQuantity: number;
+            newQuantity: number;
+          };
+          
+          const updatedLots: LotUpdate[] = [];
+          
+          // Check for updated pallets and lots within them
+          message.data.pallets.forEach((newPallet: PalletWithLots) => {
+            const oldPallet = pallets.find(p => p.id === newPallet.id);
+            if (oldPallet && newPallet.lots.length > 0) {
+              // Iterate through each lot in the new pallet
+              newPallet.lots.forEach(newLot => {
+                // Find the corresponding lot in the old pallet
+                const oldLot = oldPallet.lots.find(l => l.id === newLot.id);
+                if (oldLot && oldLot.quantity !== newLot.quantity) {
+                  // The lot exists in both pallets but the quantity has changed
+                  updatedLots.push({
+                    palletId: newPallet.palletId,
+                    lotNumber: newLot.lotNumber,
+                    oldQuantity: oldLot.quantity,
+                    newQuantity: newLot.quantity
+                  });
+                }
+              });
+            }
+          });
+          
+          // Update state with new data
+          setPallets(message.data.pallets);
+          
+          // Show notifications for important changes only to reduce notification noise
+          if (newPallets.length > 0) {
+            newPallets.forEach((pallet: PalletWithLots) => {
+              toast({
+                title: "New Pallet Added",
+                description: `Pallet ${pallet.palletId} (${pallet.rmNumber}) was added at ${pallet.location}.`,
+                duration: 5000,
+              });
+            });
+          }
+          
+          if (removedPallets.length > 0) {
+            removedPallets.forEach((pallet: PalletWithLots) => {
+              toast({
+                title: "Pallet Removed",
+                description: `Pallet ${pallet.palletId} was removed.`,
+                duration: 5000,
+              });
+            });
+          }
+          
+          if (updatedLots.length > 0) {
+            updatedLots.forEach((update: LotUpdate) => {
+              toast({
+                title: "Quantity Updated",
+                description: `Lot ${update.lotNumber} on pallet ${update.palletId} changed from ${update.oldQuantity} to ${update.newQuantity}.`,
+                duration: 5000,
+              });
+            });
+          }
+          
+          // If no specific changes detected, don't show any notification
+          // This reduces notification noise for routine background syncs
+          break;
+          
+        default:
+          console.log('Unknown message type:', message.type);
+      }
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error);
+    }
+  }, [connected, pallets, toast]);
+  
+  // Set up main connection logic
   useEffect(() => {
     // Log device info on startup for debugging
     console.log('Device info:', getBrowserInfo());
     
-    // For TC70 devices, we use REST API polling instead of WebSockets
+    // For TC70 devices, use REST API polling instead of WebSockets
     if (isTC70()) {
       console.log('TC70 detected, using REST API polling instead of WebSockets');
-      
-      // Create a more robust polling mechanism with retry capability for TC70
-      const pollData = (retryAttempt = 0) => {
-        console.log(`Polling data for TC70 (attempt: ${retryAttempt})`);
-        
-        // Use a full absolute URL to avoid any path resolution issues
-        const apiUrl = `${window.location.origin}/api/pallets`;
-        console.log(`Fetching from: ${apiUrl}`);
-        
-        // Get the auth token from localStorage for TC70 devices
-        const token = localStorage.getItem("auth_token");
-        
-        // Setup headers with auth token if it exists
-        const headers: Record<string, string> = {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store'
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        fetch(apiUrl, {
-          method: 'GET',
-          headers: headers,
-          credentials: 'include',
-          cache: 'no-store' // Prevent caching issues
-        })
-          .then(res => {
-            if (!res.ok) {
-              throw new Error(`Server responded with status: ${res.status}`);
-            }
-            return res.json();
-          })
-          .then(data => {
-            if (Array.isArray(data)) {
-              console.log(`TC70 poll successful, received ${data.length} pallets`);
-              setPallets(data);
-              setLastSync(new Date());
-              setConnected(true);
-            } else {
-              console.error('Invalid data format received:', data);
-              // Still store if it's not an array but valid
-              if (data && typeof data === 'object') {
-                setPallets(data.pallets || []);
-              }
-            }
-          })
-          .catch(error => {
-            console.error('Failed to poll data for TC70:', error);
-            setConnected(false);
-            
-            // Implement exponential backoff for retries
-            if (retryAttempt < 5) { // Limit to 5 retry attempts
-              const delay = Math.min(30000, 1000 * Math.pow(2, retryAttempt));
-              console.log(`Will retry in ${delay}ms`);
-              setTimeout(() => pollData(retryAttempt + 1), delay);
-            }
-          });
-      };
-      
-      // Initial data load
-      pollData();
-      
-      // Set up polling for TC70 devices (every 15 seconds)
-      const pollingInterval = setInterval(() => pollData(), 15000);
-      
-      // Clean up interval on unmount
-      return () => clearInterval(pollingInterval);
+      return setupPolling();
     }
     
-    // For regular devices, use WebSockets with fallback and optimizations
-    // Create WebSocket connection with exponential backoff retry
-    const createWebSocketConnection = (retryCount = 0) => {
-      // Check if WebSockets are supported
-      if (!hasWebSocketSupport()) {
-        console.log('WebSockets not supported, falling back to REST API polling');
-        
-        // Use the same robust polling mechanism we use for TC70 devices
-        const pollData = (retryAttempt = 0) => {
-          console.log(`Polling data (WebSocket fallback) (attempt: ${retryAttempt})`);
-          
-          // Use a full absolute URL to avoid any path resolution issues
-          const apiUrl = `${window.location.origin}/api/pallets`;
-          console.log(`Fetching from: ${apiUrl}`);
-          
-          // Get the auth token from localStorage
-          const token = localStorage.getItem("auth_token");
-          
-          // Setup headers with auth token if it exists
-          const headers: Record<string, string> = {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store'
-          };
-          
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-          
-          fetch(apiUrl, {
-            method: 'GET',
-            headers: headers,
-            credentials: 'include'
-          })
-            .then(res => {
-              if (!res.ok) {
-                throw new Error(`Server responded with status: ${res.status}`);
-              }
-              return res.json();
-            })
-            .then(data => {
-              if (Array.isArray(data)) {
-                console.log(`Poll successful, received ${data.length} pallets`);
-                setPallets(data);
-                setLastSync(new Date());
-                setConnected(true);
-              } else {
-                console.error('Invalid data format received:', data);
-                if (data && typeof data === 'object') {
-                  setPallets(data.pallets || []);
-                }
-              }
-            })
-            .catch(error => {
-              console.error('Failed to poll data:', error);
-              setConnected(false);
-              
-              // Retry with exponential backoff
-              if (retryAttempt < 5) {
-                const delay = Math.min(30000, 1000 * Math.pow(2, retryAttempt));
-                console.log(`Will retry in ${delay}ms`);
-                setTimeout(() => pollData(retryAttempt + 1), delay);
-              }
-            });
-        };
-        
-        // Initial data load and set up polling
-        pollData();
-        
-        // Polling interval that will run every 15 seconds
-        const pollingInterval = setInterval(() => pollData(), 15000);
-        
-        // Create a cleanup function for the parent useEffect
-        const cleanupPolling = () => {
-          clearInterval(pollingInterval);
-        };
-        
-        // Create an object to return the cleanup function that will
-        // be called when the component unmounts
-        const returnObj = {
-          pollInterval: pollingInterval,
-          cleanup: cleanupPolling
-        };
-        
-        // Clean up the interval on component unmount
-        // We'll handle the cleanup in the main useEffect return
-        return returnObj;
-      }
+    // For devices without WebSocket support, use REST API polling
+    if (!hasWebSocketSupport()) {
+      console.log('WebSockets not supported, falling back to REST API polling');
+      return setupPolling();
+    }
+    
+    // Add message handler for WebSocket messages
+    WebSocketService.addMessageHandler(handleWebSocketMessage);
+    
+    // Handle WebSocket connection status changes
+    const handleOpen = () => {
+      setConnected(true);
       
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Request initial data
+      WebSocketService.requestSync();
       
-      // Calculate the delay based on retry count, with a maximum of 10 seconds
-      // For low-power devices, use a longer backoff to conserve battery
-      const maxDelay = isLowPowerDevice() ? 30000 : 10000;
-      const delay = Math.min(maxDelay, 1000 * Math.pow(1.5, retryCount));
-      
-      try {
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          setConnected(true);
-          setLastSync(new Date());
-          
-          // Only show connection notification on non-TC70 devices to reduce noise
-          if (!connected && !isLowPowerDevice()) {
-            toast({
-              title: "Connection Established",
-              description: "Real-time updates are now active.",
-            });
-          }
-        };
-
-        ws.onclose = (event) => {
-          setConnected(false);
-          
-          // Show connection lost notification only if it wasn't a normal closure
-          // and not on TC70 or other low-power devices
-          if (event.code !== 1000 && event.code !== 1001 && !isLowPowerDevice()) {
-            toast({
-              title: "Connection Lost",
-              description: "Attempting to reconnect...",
-              variant: "destructive"
-            });
-          }
-          
-          // Try to reconnect with exponential backoff
-          setTimeout(() => {
-            createWebSocketConnection(retryCount + 1);
-          }, delay);
-        };
-
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          
-          // Only show error notification if we're still connected and a new error occurs
-          // And not on TC70 or other low-power devices
-          if (connected && !isLowPowerDevice()) {
-            toast({
-              title: "Connection Error",
-              description: "There was a problem with the real-time connection. Some updates may be delayed.",
-              variant: "destructive"
-            });
-          }
-          
-          // Log additional context
-          console.log('WebSocket readyState:', ws.readyState);
-          console.log('Current connection status:', connected ? 'Connected' : 'Disconnected');
-        };
-        
-        setSocket(ws);
-        return ws;
-      } catch (e) {
-        console.error('Error creating WebSocket connection:', e);
-        
-        // Try to reconnect with exponential backoff
-        setTimeout(() => {
-          createWebSocketConnection(retryCount + 1);
-        }, delay);
-        
-        return null;
+      // Only show connection notification on non-low-power devices
+      if (!isLowPowerDevice()) {
+        toast({
+          title: "Connection Established",
+          description: "Real-time updates are now active.",
+        });
       }
     };
     
-    // Initialize the WebSocket connection if not on TC70
-    const ws = createWebSocketConnection();
-
-    // Only add event handlers if WebSocket was created (not polling connection)
-    if (ws && 'onmessage' in ws) {
-      // This means we're dealing with an actual WebSocket instance
-      (ws as WebSocket).onmessage = (event: MessageEvent) => {
-        try {
-          const message = JSON.parse(event.data);
-          setLastSync(new Date());
-          
-          switch (message.type) {
-            case 'init':
-              // Silent data loading - reduces console spam
-              setPallets(message.data.pallets);
-              setUserCount(message.data.connectedUsers);
-              setLastSync(new Date());
-              
-              // Save client ID from server (silently)
-              if (message.data.clientId) {
-                setClientId(message.data.clientId);
-              }
-              
-              // Show a toast if this is a data sync event (not the initial connection)
-              if (connected) {
-                toast({
-                  title: "Data Synchronized",
-                  description: `${message.data.pallets.length} pallets loaded from server.`,
-                });
-              }
-              break;
-              
-            case 'connectedClients':
-              // We could manage this in state if needed in the future,
-              // but for now we'll handle it in the ConnectedClientsModal
-              console.log('Received connected clients:', message.data);
-              break;
-              
-            case 'userCount':
-              setUserCount(message.data);
-              break;
-              
-            case 'palletCreated':
-              console.log('Pallet created', message.data);
-              setPallets(prev => {
-                // Check if the pallet already exists in the array
-                const exists = prev.some(p => p.id === message.data.id);
-                if (exists) {
-                  return prev.map(p => p.id === message.data.id ? message.data : p);
-                } else {
-                  return [...prev, message.data];
-                }
-              });
-              toast({
-                title: 'Pallet Created',
-                description: `Pallet ${message.data.palletId} has been created.`,
-              });
-              break;
-              
-            case 'palletUpdated':
-              setPallets(prev => 
-                prev.map(p => p.id === message.data.id ? message.data : p)
-              );
-              toast({
-                title: 'Pallet Updated',
-                description: `Pallet ${message.data.palletId} has been updated.`,
-              });
-              break;
-              
-            case 'lotCreated':
-              setPallets(prev => 
-                prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
-              );
-              toast({
-                title: 'Lot Added',
-                description: `Lot ${message.data.lot.lotNumber} has been added.`,
-              });
-              break;
-              
-            case 'lotUpdated':
-              setPallets(prev => 
-                prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
-              );
-              break;
-              
-            case 'lotDeleted':
-              setPallets(prev => 
-                prev.map(p => p.id === message.data.pallet.id ? message.data.pallet : p)
-              );
-              toast({
-                title: 'Lot Removed',
-                description: `Lot has been removed.`,
-              });
-              break;
-              
-            case 'palletDeleted':
-              setPallets(prev => prev.filter(p => p.id !== message.data.id));
-              toast({
-                title: 'Pallet Deleted',
-                description: `Pallet ${message.data.palletId} has been permanently deleted.`,
-                variant: 'destructive'
-              });
-              break;
-              
-            case 'transactionDeleted':
-              // We don't store transactions in state, but toast a notification
-              toast({
-                title: 'Transaction Deleted',
-                description: `Transaction has been removed from history.`,
-              });
-              break;
-              
-            case 'notification':
-              toast({
-                title: message.data.title,
-                description: message.data.description,
-              });
-              break;
-
-            case 'fullSync':
-              // Handle automatic server-initiated data sync (every 60s)
-              // Silent data sync - no console logging
-              
-              // Compare pallets to detect changes
-              const currentPalletIds = new Set(pallets.map((p: PalletWithLots) => p.id));
-              const newPalletIds = new Set(message.data.pallets.map((p: PalletWithLots) => p.id));
-              
-              // Check for new pallets
-              const newPallets = message.data.pallets.filter((p: PalletWithLots) => !currentPalletIds.has(p.id));
-              
-              // Check for removed pallets
-              const removedPallets = pallets.filter((p: PalletWithLots) => !newPalletIds.has(p.id));
-              
-              // Check for updated lots (quantity changes, etc.)
-              type LotUpdate = {
-                palletId: string;
-                lotNumber: string;
-                oldQuantity: number;
-                newQuantity: number;
-              };
-              const updatedLots: LotUpdate[] = [];
-              
-              pallets.forEach((existingPallet: PalletWithLots) => {
-                const newPallet = message.data.pallets.find((p: PalletWithLots) => p.id === existingPallet.id);
-                if (newPallet) {
-                  // Check each lot for changes
-                  existingPallet.lots.forEach((existingLot) => {
-                    // Use proper type for the lots
-                    const newLot = newPallet.lots.find((l: any) => {
-                      return l.id === existingLot.id;
-                    });
-                    if (newLot && newLot.quantity !== existingLot.quantity) {
-                      updatedLots.push({
-                        palletId: existingPallet.palletId,
-                        lotNumber: existingLot.lotNumber,
-                        oldQuantity: existingLot.quantity,
-                        newQuantity: newLot.quantity
-                      });
-                    }
-                  });
-                }
-              });
-              
-              // Update state with new data
-              setPallets(message.data.pallets);
-              setUserCount(message.data.connectedUsers || userCount);
-              setLastSync(new Date());
-              
-              // Show notifications for detected changes
-              if (newPallets.length > 0) {
-                newPallets.forEach((pallet: PalletWithLots) => {
-                  toast({
-                    title: "New Pallet Added",
-                    description: `Pallet ${pallet.palletId} (${pallet.rmNumber}) was added at ${pallet.location}.`,
-                    duration: 5000,
-                  });
-                });
-              }
-              
-              if (removedPallets.length > 0) {
-                removedPallets.forEach((pallet: PalletWithLots) => {
-                  toast({
-                    title: "Pallet Removed",
-                    description: `Pallet ${pallet.palletId} was removed.`,
-                    duration: 5000,
-                  });
-                });
-              }
-              
-              if (updatedLots.length > 0) {
-                updatedLots.forEach((update: LotUpdate) => {
-                  toast({
-                    title: "Quantity Updated",
-                    description: `Lot ${update.lotNumber} on pallet ${update.palletId} changed from ${update.oldQuantity} to ${update.newQuantity}.`,
-                    duration: 5000,
-                  });
-                });
-              }
-              
-              // If no specific changes detected, don't show any notification
-              // This reduces notification noise for routine background syncs
-              break;
-              
-            default:
-              console.log('Unknown message type:', message.type);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-    }
-
-    // Clean up the WebSocket connection or polling interval
+    const handleClose = () => {
+      setConnected(false);
+      
+      // Only show disconnection on non-low-power devices
+      if (!isLowPowerDevice()) {
+        toast({
+          title: "Connection Lost",
+          description: "Attempting to reconnect...",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    const handleError = () => {
+      // Only show error on non-low-power devices
+      if (!isLowPowerDevice()) {
+        toast({
+          title: "Connection Error",
+          description: "There was a problem with the real-time connection.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    // Add event listeners
+    WebSocketService.addEventListener('open', handleOpen);
+    WebSocketService.addEventListener('close', handleClose);
+    WebSocketService.addEventListener('error', handleError);
+    
+    // Initialize connection
+    WebSocketService.connect();
+    
+    // Set up a health check every 30 seconds
+    const healthCheckInterval = setInterval(() => {
+      if (!WebSocketService.isHealthy()) {
+        console.log("WebSocket connection is stale, reconnecting...");
+        WebSocketService.reconnect();
+      }
+    }, 30000);
+    
+    // Clean up
     return () => {
-      if (ws) {
-        // If it's a real WebSocket
-        if ('readyState' in ws && 'close' in ws) {
-          const webSocket = ws as WebSocket;
-          if (webSocket.readyState === WebSocket.OPEN) {
-            webSocket.close();
-          }
-        }
-        // If it's our polling connection
-        else if ('cleanup' in ws && typeof ws.cleanup === 'function') {
-          const pollingConnection = ws as PollingConnection;
-          pollingConnection.cleanup();
-        }
-      }
+      WebSocketService.removeMessageHandler(handleWebSocketMessage);
+      WebSocketService.removeEventListener('open', handleOpen);
+      WebSocketService.removeEventListener('close', handleClose);
+      WebSocketService.removeEventListener('error', handleError);
+      clearInterval(healthCheckInterval);
     };
-  }, [toast, connected]);
-
+  }, [handleWebSocketMessage, isLowPowerDevice, setupPolling, toast]);
+  
+  // Update clientId from the service
+  useEffect(() => {
+    const clientIdFromService = WebSocketService.getClientId();
+    if (clientIdFromService !== clientId) {
+      setClientId(clientIdFromService);
+    }
+  }, [clientId]);
+  
+  // Update connection status from the service
+  useEffect(() => {
+    const updateConnectionStatus = () => {
+      const status = WebSocketService.getStatus();
+      setConnected(status === 'open');
+    };
+    
+    // Update status whenever WebSocket events occur
+    WebSocketService.addEventListener('open', updateConnectionStatus);
+    WebSocketService.addEventListener('close', updateConnectionStatus);
+    WebSocketService.addEventListener('error', updateConnectionStatus);
+    
+    // Initial update
+    updateConnectionStatus();
+    
+    // Clean up
+    return () => {
+      WebSocketService.removeEventListener('open', updateConnectionStatus);
+      WebSocketService.removeEventListener('close', updateConnectionStatus);
+      WebSocketService.removeEventListener('error', updateConnectionStatus);
+    };
+  }, []);
+  
   return (
-    <WebSocketContext.Provider value={{ 
-      connected, 
-      pallets, 
-      userCount, 
-      lastSync, 
-      clientId,
-      getConnectedClients,
-      syncData,
-      isOnline,
-      pendingOperations,
-      connectionStatus
-    }}>
+    <WebSocketContext.Provider
+      value={{
+        connected,
+        pallets,
+        userCount,
+        lastSync,
+        clientId,
+        getConnectedClients,
+        syncData,
+        isOnline,
+        pendingOperations,
+        connectionStatus
+      }}
+    >
       {children}
     </WebSocketContext.Provider>
   );
