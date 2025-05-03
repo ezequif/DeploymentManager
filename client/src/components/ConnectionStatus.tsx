@@ -1,11 +1,46 @@
 import { useWebSocket } from '@/lib/websocket';
 import { cn } from '@/lib/utils';
-import { Wifi, WifiOff, Clock, AlertCircle } from 'lucide-react';
+import { Wifi, WifiOff, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
 export function ConnectionStatus() {
-  const { connected, connectionStatus, lastSync, pendingOperations } = useWebSocket();
+  const { connected, connectionStatus: wsConnectionStatus, lastSync, pendingOperations: wsPendingOperations } = useWebSocket();
+  
+  // For testing purposes: uncomment to simulate different states
+  // Comment this section in production
+  /*
+  const [simulateStatus, setSimulateStatus] = useState<'online' | 'offline' | 'limited' | null>(null);
+  const [simulatePending, setSimulatePending] = useState<number | null>(null);
+  
+  // Use simulated values if provided, otherwise use real values
+  const connectionStatus = simulateStatus || wsConnectionStatus;
+  const pendingOperations = simulatePending !== null ? Array(simulatePending).fill({}) : wsPendingOperations;
+  
+  useEffect(() => {
+    // For testing cycling through different states
+    const statusInterval = setInterval(() => {
+      setSimulateStatus(prev => {
+        if (prev === 'online') return 'limited';
+        if (prev === 'limited') return 'offline';
+        return 'online';
+      });
+      
+      setSimulatePending(prev => {
+        if (prev === null || prev === 0) return 3;
+        if (prev === 3) return 1;
+        return 0;
+      });
+    }, 3000);
+    
+    return () => clearInterval(statusInterval);
+  }, []);
+  */
+  
+  // Use real values from WebSocket context
+  const connectionStatus = wsConnectionStatus;
+  const pendingOperations = wsPendingOperations;
+  
   const [visible, setVisible] = useState(false);
   const [lastSyncFormatted, setLastSyncFormatted] = useState('');
   
@@ -49,7 +84,7 @@ export function ConnectionStatus() {
   }
   
   return (
-    <div 
+    <div
       className={cn(
         "fixed bottom-16 right-4 z-50 p-2 rounded-full shadow-lg transition-all duration-300",
         // Colors based on connection status
@@ -63,14 +98,32 @@ export function ConnectionStatus() {
         {connectionStatus === 'online' ? (
           <Wifi className="h-6 w-6" />
         ) : connectionStatus === 'limited' ? (
-          <AlertCircle className="h-6 w-6" />
+          <AlertCircle className="h-6 w-6 animate-pulse" />
         ) : (
-          <WifiOff className="h-6 w-6" />
+          <WifiOff className="h-6 w-6 animate-pulse" />
+        )}
+        
+        {/* Pending operations indicator */}
+        {pendingOperations.length > 0 && (
+          <div 
+            className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-bounce"
+          >
+            {pendingOperations.length}
+          </div>
         )}
         
         {/* Tooltip with detailed status */}
         <div className="invisible group-hover:visible absolute bottom-full right-0 mb-2 w-64 p-3 bg-white rounded-lg shadow-lg border border-gray-200 text-sm z-50">
-          <div className="font-medium mb-1">
+          <div className="font-medium mb-1 flex items-center">
+            <span className="mr-2">
+              {connectionStatus === 'online' ? (
+                <Wifi className="h-4 w-4" />
+              ) : connectionStatus === 'limited' ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <WifiOff className="h-4 w-4" />
+              )}
+            </span>
             {connectionStatus === 'online' 
               ? 'Connected' 
               : connectionStatus === 'limited'
@@ -84,7 +137,8 @@ export function ConnectionStatus() {
           </div>
           
           {pendingOperations.length > 0 && (
-            <div className="text-amber-700 mt-1">
+            <div className="flex items-center text-amber-700 mt-1">
+              <RefreshCw className="h-4 w-4 mr-1 inline animate-spin" />
               {pendingOperations.length} operation{pendingOperations.length !== 1 ? 's' : ''} pending sync
             </div>
           )}
