@@ -268,14 +268,12 @@ export function setupAuth(app: any) {
   app.post('/api/auth/admin-reset-password', authenticateToken, authorizeRoles('admin'), adminResetPassword);
   
   // Get current user route
-  app.get('/api/auth/me', (req: Request, res: Response) => {
+  app.get('/api/auth/me', authenticateToken, (req: Request, res: Response) => {
     // The user will be set by the authenticateToken middleware if the token is valid
     const user = (req as any).user;
     
-    if (!user) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    
+    // By this point, user should always be defined because authenticateToken middleware
+    // would have returned a 401 error if the token was invalid
     return res.status(200).json({ user });
   });
 }
