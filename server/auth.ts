@@ -5,6 +5,11 @@ import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { User, InsertUser } from '@shared/schema';
 import { authenticateToken, authorizeRoles } from './middleware/auth';
+import { z } from 'zod';
+
+// Use the correct types from schema.ts
+type User = typeof users.$inferSelect;
+type InsertUser = z.infer<typeof insertUserSchema>;
 
 // Secret for JWT - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'warehouse-management-temp-secret';

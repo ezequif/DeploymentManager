@@ -18,6 +18,7 @@ import { z } from "zod";
 
 export default function Settings() {
   const { preferredUnit, setPreferredUnit, autoConvert, setAutoConvert } = useUnitSettings();
+  const { user } = useAuth();
   
   const [settings, setSettings] = useState({
     barcodeScanner: true,
@@ -26,7 +27,54 @@ export default function Settings() {
     enableSounds: true,
   });
   
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
+  const [formErrors, setFormErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
   const { toast } = useToast();
+  
+  // Password change mutation
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const response = await apiRequest('POST', '/api/auth/change-password', data);
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      // Store the new token
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      
+      // Clear the form
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      
+      // Show success message
+      toast({
+        title: 'Password Changed',
+        description: 'Your password has been successfully updated.',
+        variant: 'default',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error Changing Password',
+        description: error.message || 'There was a problem changing your password.',
+        variant: 'destructive',
+      });
+    }
+  });
   
   // Update unit settings
   const handleSaveSettings = () => {
@@ -164,6 +212,145 @@ export default function Settings() {
                 >
                   Save Settings
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="security" className="mt-2 sm:mt-4">
+          <Card>
+            <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+              <CardTitle className="flex items-center text-base sm:text-lg">
+                <LockIcon className="mr-2 h-4 w-4" /> 
+                Security Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6 space-y-3 sm:space-y-4">
+              <div className="space-y-4">
+                <h3 className="text-sm sm:text-base font-medium">Change Password</h3>
+                <p className="text-xs sm:text-sm text-gray-500">
+                  Use the form below to change your password. For security reasons, you'll need to enter your current password.
+                </p>
+                
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="current-password" className="text-sm">Current Password</Label>
+                    <Input 
+                      id="current-password"
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({
+                        ...passwordForm,
+                        currentPassword: e.target.value
+                      })}
+                      placeholder="Enter your current password"
+                      className="h-8 sm:h-10 text-xs sm:text-sm"
+                    />
+                    {formErrors.currentPassword && (
+                      <p className="text-xs text-red-500">{formErrors.currentPassword}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="new-password" className="text-sm">New Password</Label>
+                    <Input 
+                      id="new-password"
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({
+                        ...passwordForm,
+                        newPassword: e.target.value
+                      })}
+                      placeholder="Enter your new password"
+                      className="h-8 sm:h-10 text-xs sm:text-sm"
+                    />
+                    {formErrors.newPassword && (
+                      <p className="text-xs text-red-500">{formErrors.newPassword}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="confirm-password" className="text-sm">Confirm New Password</Label>
+                    <Input 
+                      id="confirm-password"
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({
+                        ...passwordForm,
+                        confirmPassword: e.target.value
+                      })}
+                      placeholder="Confirm your new password"
+                      className="h-8 sm:h-10 text-xs sm:text-sm"
+                    />
+                    {formErrors.confirmPassword && (
+                      <p className="text-xs text-red-500">{formErrors.confirmPassword}</p>
+                    )}
+                  </div>
+                  
+                  <div className="pt-2">
+                    <Button
+                      onClick={() => {
+                        // Reset form errors
+                        setFormErrors({
+                          currentPassword: '',
+                          newPassword: '',
+                          confirmPassword: '',
+                        });
+                        
+                        // Validate form
+                        let valid = true;
+                        
+                        if (!passwordForm.currentPassword) {
+                          setFormErrors(prev => ({
+                            ...prev,
+                            currentPassword: 'Current password is required'
+                          }));
+                          valid = false;
+                        }
+                        
+                        if (!passwordForm.newPassword) {
+                          setFormErrors(prev => ({
+                            ...prev,
+                            newPassword: 'New password is required'
+                          }));
+                          valid = false;
+                        } else if (passwordForm.newPassword.length < 6) {
+                          setFormErrors(prev => ({
+                            ...prev,
+                            newPassword: 'Password must be at least 6 characters'
+                          }));
+                          valid = false;
+                        }
+                        
+                        if (!passwordForm.confirmPassword) {
+                          setFormErrors(prev => ({
+                            ...prev,
+                            confirmPassword: 'Please confirm your new password'
+                          }));
+                          valid = false;
+                        } else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                          setFormErrors(prev => ({
+                            ...prev,
+                            confirmPassword: 'Passwords do not match'
+                          }));
+                          valid = false;
+                        }
+                        
+                        if (valid) {
+                          // Submit the form
+                          changePasswordMutation.mutate({
+                            currentPassword: passwordForm.currentPassword,
+                            newPassword: passwordForm.newPassword,
+                          });
+                        }
+                      }}
+                      disabled={changePasswordMutation.isPending}
+                      className="w-full text-xs sm:text-sm h-8 sm:h-10"
+                    >
+                      {changePasswordMutation.isPending ? 'Changing Password...' : 'Change Password'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
