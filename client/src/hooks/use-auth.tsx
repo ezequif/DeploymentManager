@@ -1,18 +1,37 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { z } from "zod";
-// We need to import User and InsertUser from schema
-import { users, insertUserSchema } from "@shared/schema";
-// Define SelectUser type based on schema
-type SelectUser = typeof users.$inferSelect;
-// Define InsertUser type based on schema
-type InsertUser = z.infer<typeof insertUserSchema>;
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+// Define user types directly until schema import issue is resolved
+interface User {
+  id: number;
+  username: string;
+  password: string;
+  role: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  active: boolean;
+  createdAt: Date;
+  lastLogin?: Date;
+}
+
+interface InsertUser {
+  username: string;
+  password: string;
+  role?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  active?: boolean;
+}
+
+type SelectUser = User;
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -52,6 +71,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 300000, // 5 minutes
     gcTime: 3600000 // 1 hour - gcTime is the newer name for cacheTime
   });
+  
+  // Effect to monitor token changes and refresh user data
+  useEffect(() => {
+    const tokenCheckInterval = setInterval(() => {
+      const currentToken = localStorage.getItem("auth_token");
+      // If token exists but user data is missing, refetch
+      if (currentToken && !user) {
+        refetch();
+      }
+    }, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(tokenCheckInterval);
+  }, [user, refetch]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
