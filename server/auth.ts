@@ -3,13 +3,33 @@ import jwt from 'jsonwebtoken';
 import { storage } from './storage';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
-import { User, InsertUser } from '@shared/schema';
 import { authenticateToken, authorizeRoles } from './middleware/auth';
 import { z } from 'zod';
 
-// Use the correct types from schema.ts
-type User = typeof users.$inferSelect;
-type InsertUser = z.infer<typeof insertUserSchema>;
+// Use the correct types directly inline
+type User = {
+  id: number;
+  username: string;
+  password: string;
+  role: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  active: boolean;
+  createdAt: Date;
+  lastLogin?: Date;
+};
+
+// Define the insert type for user creation
+type InsertUser = {
+  username: string;
+  password: string;
+  role?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  active?: boolean;
+};
 
 // Secret for JWT - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'warehouse-management-temp-secret';
