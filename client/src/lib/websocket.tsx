@@ -81,8 +81,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     }
   }, [socket]);
   
+  // Track last sync request time to prevent too frequent syncs
+  const lastSyncRequestRef = useRef<number>(0);
+  // Minimum time between sync requests (3 seconds)
+  const MIN_SYNC_INTERVAL = 3000;
+  
   // Function to request a full data sync from the server
   const syncData = useCallback(() => {
+    // Implement debouncing to prevent too frequent sync requests
+    const now = Date.now();
+    if (now - lastSyncRequestRef.current < MIN_SYNC_INTERVAL) {
+      console.log('Sync request debounced (too frequent)');
+      return;
+    }
+    
+    // Update the last sync request time
+    lastSyncRequestRef.current = now;
+    
     let canUseWebSocket = false;
     
     // Check if we have a valid WebSocket connection
@@ -118,7 +133,14 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         })
         .then(data => {
           if (Array.isArray(data)) {
-            console.log(`Manual sync successful, received ${data.length} pallets`);
+            // Only log if data changed
+            const prevPalletCount = pallets.length;
+            if (prevPalletCount !== data.length) {
+              console.log(`Manual sync successful, received ${data.length} pallets (previously had ${prevPalletCount})`);
+            } else {
+              console.log(`Manual sync completed - no data changes detected`);
+            }
+            
             setPallets(data);
             setLastSync(new Date());
             setConnected(true);
@@ -141,7 +163,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           });
         });
     }
-  }, [socket, toast]);
+  }, [socket, toast, pallets.length]);
 
   // Update the connection status when connected or online state changes
   useEffect(() => {

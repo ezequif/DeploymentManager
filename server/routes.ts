@@ -400,6 +400,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
            
           case 'requestSync':
+            // Store last sync time per client to throttle requests
+            // This is a closure-scoped map that persists between requests
+            if (!this.clientSyncTimes) {
+              this.clientSyncTimes = new Map<string, number>();
+            }
+            
+            const MIN_CLIENT_SYNC_INTERVAL = 2000; // 2 seconds minimum between syncs
+            const now = Date.now();
+            const lastSyncTime = this.clientSyncTimes.get(clientInfo.id) || 0;
+            
+            // Check if we should throttle this sync request
+            if (now - lastSyncTime < MIN_CLIENT_SYNC_INTERVAL) {
+              // Silent throttle - just acknowledge without full sync to reduce load
+              if (ws.readyState === 1) {
+                ws.send(JSON.stringify({
+                  type: 'syncAcknowledged',
+                  data: { message: 'Request received, will sync soon' }
+                }));
+              }
+              return;
+            }
+            
+            // Update the last sync time for this client
+            this.clientSyncTimes.set(clientInfo.id, now);
+            
             // Client is requesting a full data sync
             console.log(`Client ${clientInfo.id} requested data sync`);
             
@@ -408,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (ws.readyState === 1) { // WebSocket.OPEN
                 console.log(`Sending data sync to client ${clientInfo.id} with ${pallets.length} pallets`);
                 ws.send(JSON.stringify({
-                  type: 'init',
+                  type: 'fullSync', // Changed from 'init' to 'fullSync' for consistency
                   data: { 
                     pallets,
                     connectedUsers: wss.clients.size,
