@@ -18,6 +18,8 @@ import { UnitProvider } from "@/hooks/use-unit-settings";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 
+import UserManagement from "./pages/UserManagement";
+
 function Router() {
   return (
     <Layout>
@@ -25,6 +27,7 @@ function Router() {
         <ProtectedRoute path="/" component={PalletList} />
         <ProtectedRoute path="/history" component={History} />
         <ProtectedRoute path="/settings" component={Settings} />
+        <ProtectedRoute path="/users" component={UserManagement} />
         <Route path="/auth" component={AuthPage} />
         <Route component={NotFound} />
       </Switch>
