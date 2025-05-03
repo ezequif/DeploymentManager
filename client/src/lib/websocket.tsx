@@ -1,7 +1,17 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode, useRef } from 'react';
 import { PalletWithLots } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 import { isTC70, isLowPowerDevice, hasWebSocketSupport, getBrowserInfo } from './deviceDetection';
+
+// Type for pending operations that will be stored when offline
+export type PendingOperation = {
+  id: string;
+  endpoint: string;
+  method: 'POST' | 'PATCH' | 'DELETE';
+  data: any;
+  timestamp: number;
+  retryCount: number;
+};
 
 type WebSocketContextType = {
   connected: boolean;
@@ -11,6 +21,9 @@ type WebSocketContextType = {
   clientId: string | null;
   getConnectedClients: () => void;
   syncData: () => void; // Function to force data refresh
+  isOnline: boolean; // Network connection status
+  pendingOperations: PendingOperation[]; // Operations waiting to be processed
+  connectionStatus: 'online' | 'offline' | 'limited'; // More detailed status
 };
 
 const WebSocketContext = createContext<WebSocketContextType>({
@@ -21,6 +34,9 @@ const WebSocketContext = createContext<WebSocketContextType>({
   clientId: null,
   getConnectedClients: () => {},
   syncData: () => {},
+  isOnline: navigator.onLine,
+  pendingOperations: [],
+  connectionStatus: 'offline',
 });
 
 export const useWebSocket = () => useContext(WebSocketContext);
@@ -44,6 +60,15 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const [userCount, setUserCount] = useState(0);
   const [lastSync, setLastSync] = useState(new Date());
   const [clientId, setClientId] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [pendingOperations, setPendingOperations] = useState<PendingOperation[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline' | 'limited'>(
+    navigator.onLine ? (connected ? 'online' : 'limited') : 'offline'
+  );
+  
+  // Used for reconnection tracking
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
   const { toast } = useToast();
   
   // Function to request the list of connected clients
@@ -117,6 +142,96 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         });
     }
   }, [socket, toast]);
+
+  // Update the connection status when connected or online state changes
+  useEffect(() => {
+    if (!isOnline) {
+      setConnectionStatus('offline');
+    } else if (connected) {
+      setConnectionStatus('online');
+      // Try to process any pending operations when connection is restored
+      if (pendingOperations.length > 0) {
+        processPendingOperations();
+      }
+    } else {
+      setConnectionStatus('limited');
+    }
+  }, [isOnline, connected, pendingOperations]);
+
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast({
+        title: "Back Online",
+        description: "Your internet connection has been restored.",
+      });
+      // Trigger a data sync
+      syncData();
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast({
+        title: "Offline Mode",
+        description: "Working offline. Changes will sync when connection is restored.",
+        variant: "destructive"
+      });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncData, toast]);
+  
+  // Process pending operations that were stored while offline
+  const processPendingOperations = useCallback(() => {
+    if (pendingOperations.length === 0 || !isOnline) return;
+    
+    // Clone the current pending operations
+    const operations = [...pendingOperations];
+    
+    // Clear the pending operations first to prevent duplicates if processing fails
+    setPendingOperations([]);
+    
+    // Show toast notification about syncing changes
+    if (operations.length > 0) {
+      toast({
+        title: "Syncing Changes",
+        description: `Processing ${operations.length} pending operations...`,
+      });
+    }
+    
+    // Process each operation in sequence
+    operations.forEach(op => {
+      fetch(op.endpoint, {
+        method: op.method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(op.data)
+      })
+      .catch(error => {
+        console.error(`Failed to process pending operation:`, error, op);
+        
+        // If still online, retry with incremented retry count
+        if (isOnline && op.retryCount < 3) {
+          setPendingOperations(prev => [...prev, {
+            ...op,
+            retryCount: op.retryCount + 1,
+            timestamp: Date.now()
+          }]);
+        }
+      });
+    });
+    
+    // After processing operations, force a full sync to ensure consistency
+    syncData();
+  }, [pendingOperations, isOnline, syncData, toast]);
 
   useEffect(() => {
     // Log device info on startup for debugging
@@ -576,7 +691,10 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       lastSync, 
       clientId,
       getConnectedClients,
-      syncData
+      syncData,
+      isOnline,
+      pendingOperations,
+      connectionStatus
     }}>
       {children}
     </WebSocketContext.Provider>

@@ -3,6 +3,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import { useLocation } from "wouter";
 import { LayoutGrid, History, Settings } from "lucide-react";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 interface LayoutProps {
   children: ReactNode;
@@ -47,6 +48,9 @@ export default function Layout({ children }: LayoutProps) {
       </main>
       
       <Footer />
+      
+      {/* Connection status indicator */}
+      <ConnectionStatus />
     </div>
   );
 }
