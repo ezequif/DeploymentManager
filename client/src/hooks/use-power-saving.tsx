@@ -155,11 +155,7 @@ export function PowerSavingProvider({ children }: { children: ReactNode }) {
     
     return () => {
       prefersReducedMotion.removeEventListener('change', handleReducedMotionChange);
-      
-      if ('connection' in navigator) {
-        const connection = (navigator as any).connection;
-        connection.removeEventListener('change', handleConnectionChange);
-      }
+      // Connection cleanup is handled in the network change listener setup
     };
   }, [autoPowerSaving, powerSavingMode]);
 
