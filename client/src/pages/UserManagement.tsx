@@ -93,10 +93,18 @@ type EditUserFormValues = z.infer<typeof editUserSchema>;
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export default function UserManagement() {
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  
+  // Refresh user auth state when component mounts
+  useEffect(() => {
+    const refreshAuth = async () => {
+      await refetchUser();
+    };
+    refreshAuth();
+  }, [refetchUser]);
   
   const [selectedUser, setSelectedUser] = useState<UserWithoutPassword | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImportCSV } from "@/components/ImportCSV";
 import { ExportCSV } from "@/components/ExportCSV";
@@ -18,7 +18,15 @@ import { z } from "zod";
 
 export default function Settings() {
   const { preferredUnit, setPreferredUnit, autoConvert, setAutoConvert } = useUnitSettings();
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
+  
+  // Refresh user auth state when component mounts
+  useEffect(() => {
+    const refreshAuth = async () => {
+      await refetchUser();
+    };
+    refreshAuth();
+  }, [refetchUser]);
   
   const [settings, setSettings] = useState({
     barcodeScanner: true,
