@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 // Secret for JWT - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'warehouse-management-temp-secret';
@@ -26,7 +26,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   
   try {
     // Verify the token
-    const decoded = verify(token, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
     
     // Add user info to request for use in route handlers
     (req as any).user = {
@@ -79,7 +79,7 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
   }
   
   try {
-    const decoded = verify(token, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
     (req as any).user = {
       userId: decoded.userId,
       username: decoded.username,

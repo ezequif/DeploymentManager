@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket as WS } from "ws";
 import { storage } from "./storage";
@@ -12,6 +13,8 @@ import {
   Unit
 } from "@shared/schema";
 import { z } from "zod";
+import { setupAuth } from "./auth";
+import { authenticateToken, authorizeRoles, optionalAuthenticate } from "./middleware/auth";
 
 // Using the WebSocket from 'ws' package, which is a bit different from browser's WebSocket
 type ServerWebSocket = WS;
@@ -22,6 +25,9 @@ type WSMessage = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  setupAuth(app);
+  
   // Store intervals for cleanup when server shuts down
   const intervals: NodeJS.Timeout[] = [];
   const httpServer = createServer(app);
@@ -315,8 +321,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Routes
-  // Data Import Endpoint for CSV uploads
-  app.post('/api/import', async (req, res) => {
+  // Data Import Endpoint for CSV uploads - requires manager or admin role
+  app.post('/api/import', authenticateToken, authorizeRoles('admin', 'manager'), async (req, res) => {
     try {
       const { data, importType } = req.body;
       
@@ -541,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get connected clients info (admin endpoint)
-  app.get('/api/connected-clients', async (req, res) => {
+  app.get('/api/connected-clients', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
       res.json(getConnectedClientDetails());
     } catch (error) {
@@ -629,8 +635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new pallet with support for multiple lots
-  app.post('/api/pallets', async (req, res) => {
+  // Create a new pallet with support for multiple lots - requires operator+ role
+  app.post('/api/pallets', authenticateToken, authorizeRoles('admin', 'manager', 'operator'), async (req, res) => {
     try {
       const validatedData = insertPalletSchema.parse(req.body);
       const pallet = await storage.createPallet(validatedData);

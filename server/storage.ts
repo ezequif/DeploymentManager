@@ -2,9 +2,10 @@ import {
   Pallet, InsertPallet, 
   Lot, InsertLot,
   Transaction, InsertTransaction,
+  User, InsertUser,
   PalletWithLots, PalletStatus
 } from "@shared/schema";
-import { pallets, lots, transactions } from "@shared/schema";
+import { pallets, lots, transactions, users } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -88,6 +89,7 @@ export class DatabaseStorage implements IStorage {
     
     return results;
   }
+  
   async getPallets(statusFilter?: string): Promise<PalletWithLots[]> {
     let query = db.select().from(pallets);
     
@@ -346,17 +348,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLot(id: number): Promise<boolean> {
     try {
-      console.log(`Attempting to delete lot with ID: ${id}`);
-      
-      // First delete any transactions related to this lot
-      console.log(`Deleting transactions for lot ID: ${id}`);
+      // First delete all related transactions
       await db.delete(transactions).where(eq(transactions.lotId, id));
       
       // Then delete the lot
-      console.log(`Deleting lot ID: ${id}`);
       const result = await db.delete(lots).where(eq(lots.id, id)).returning();
-      
-      console.log(`Delete result: ${JSON.stringify(result)}`);
       return result.length > 0;
     } catch (error) {
       console.error(`Error deleting lot: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -365,26 +361,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactions(): Promise<Transaction[]> {
-    const transactionsData = await db
+    return db
       .select()
       .from(transactions)
       .orderBy(desc(transactions.createdAt));
-    
-    return transactionsData;
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [newTransaction] = await db
-      .insert(transactions)
-      .values({
-        ...transaction,
-        transactionType: transaction.transactionType as string
-      })
-      .returning();
-    
+    const [newTransaction] = await db.insert(transactions).values(transaction).returning();
     return newTransaction;
   }
-  
+
   async deleteTransaction(id: number): Promise<boolean> {
     const result = await db.delete(transactions).where(eq(transactions.id, id)).returning();
     return result.length > 0;
@@ -422,6 +409,99 @@ export class DatabaseStorage implements IStorage {
     
     // Format with leading zeros (5 digits)
     return `PAL${nextNumericPart.toString().padStart(5, '0')}`;
+  }
+
+  // User Management
+  async getUsers(): Promise<User[]> {
+    // Exclude passwords from the results for security
+    const usersData = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        active: users.active,
+        createdAt: users.createdAt,
+        lastLogin: users.lastLogin
+      })
+      .from(users)
+      .orderBy(asc(users.username));
+    
+    return usersData;
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    // Exclude password from the result for security
+    const [user] = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        active: users.active,
+        createdAt: users.createdAt,
+        lastLogin: users.lastLogin
+      })
+      .from(users)
+      .where(eq(users.id, id));
+    
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    // Include password for authentication
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    try {
+      // Insert the new user
+      const [newUser] = await db.insert(users).values(user).returning();
+      return newUser;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      throw error;
+    }
+  }
+
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    try {
+      // Update the user
+      const [updatedUser] = await db
+        .update(users)
+        .set(userData)
+        .where(eq(users.id, id))
+        .returning();
+      
+      return updatedUser;
+    } catch (error) {
+      console.error(`Error updating user (ID: ${id}):`, error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    try {
+      // Delete the user
+      const result = await db
+        .delete(users)
+        .where(eq(users.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting user (ID: ${id}):`, error);
+      throw error;
+    }
   }
 }
 

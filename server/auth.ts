@@ -1,0 +1,156 @@
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { storage } from './storage';
+import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
+import { User, InsertUser } from '@shared/schema';
+
+// Secret for JWT - in production, this should be in environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'warehouse-management-temp-secret';
+const TOKEN_EXPIRY = '24h'; // Token expires after 24 hours
+
+// Use promisify to convert callback-based scrypt to Promise-based
+const scryptAsync = promisify(scrypt);
+
+// Password hashing function
+export async function hashPassword(password: string): Promise<string> {
+  // Generate a salt
+  const salt = randomBytes(16).toString('hex');
+  // Hash the password with the salt
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  // Return the hashed password with the salt appended
+  return `${derivedKey.toString('hex')}.${salt}`;
+}
+
+// Password verification function
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  // Split the stored hash into the hash and the salt
+  const [storedHash, salt] = hashedPassword.split('.');
+  // Hash the provided password with the same salt
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  // Compare the hashes using timing-safe comparison
+  return timingSafeEqual(
+    Buffer.from(storedHash, 'hex'),
+    derivedKey
+  );
+}
+
+// Generate a JWT token for a user
+export function generateToken(user: User): string {
+  const payload = {
+    userId: user.id,
+    username: user.username,
+    role: user.role
+  };
+  
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+}
+
+// Authentication handler for login
+export async function authenticate(req: Request, res: Response) {
+  try {
+    const { username, password } = req.body;
+    
+    // Input validation
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // Find the user by username
+    const user = await storage.getUserByUsername(username);
+    
+    // If user not found or inactive
+    if (!user || !user.active) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    
+    // Verify the password
+    const isPasswordValid = await verifyPassword(password, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    
+    // Generate a token
+    const token = generateToken(user);
+    
+    // Update last login timestamp
+    await storage.updateUser(user.id, { lastLogin: new Date() });
+    
+    // Return user info and token (without the password)
+    const { password: _, ...userWithoutPassword } = user;
+    
+    return res.status(200).json({
+      user: userWithoutPassword,
+      token
+    });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return res.status(500).json({ error: 'Internal server error during authentication' });
+  }
+}
+
+// Registration handler
+export async function register(req: Request, res: Response) {
+  try {
+    const { username, password, ...userData } = req.body;
+    
+    // Input validation
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // Check if username already exists
+    const existingUser = await storage.getUserByUsername(username);
+    
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    
+    // Hash the password
+    const hashedPassword = await hashPassword(password);
+    
+    // Create the user
+    const newUser = await storage.createUser({
+      username,
+      password: hashedPassword,
+      role: 'viewer', // Default role for new users
+      ...userData
+    });
+    
+    // Generate a token
+    const token = generateToken(newUser);
+    
+    // Return user info and token (without the password)
+    const { password: _, ...userWithoutPassword } = newUser;
+    
+    return res.status(201).json({
+      user: userWithoutPassword,
+      token
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    return res.status(500).json({ error: 'Internal server error during registration' });
+  }
+}
+
+// Setup auth routes and middleware
+export function setupAuth(app: any) {
+  // Login route
+  app.post('/api/auth/login', authenticate);
+  
+  // Registration route
+  app.post('/api/auth/register', register);
+  
+  // Get current user route
+  app.get('/api/auth/me', (req: Request, res: Response) => {
+    // The user will be set by the authenticateToken middleware if the token is valid
+    const user = (req as any).user;
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    return res.status(200).json({ user });
+  });
+}
