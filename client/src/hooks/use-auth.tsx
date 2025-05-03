@@ -4,7 +4,8 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { User, InsertUser, type User as SelectUser } from "@shared/schema";
+import { User, InsertUser } from "@shared/schema"; 
+type SelectUser = User;
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -12,6 +13,7 @@ type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
+  refetchUser: () => Promise<SelectUser | null>;
   loginMutation: UseMutationResult<{user: SelectUser, token: string}, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<{user: SelectUser, token: string}, Error, InsertUser>;
@@ -110,12 +112,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Create a refetch function that returns a promise
+  const refetchUser = async (): Promise<SelectUser | null> => {
+    try {
+      const { data } = await refetch();
+      return data ?? null;
+    } catch (error) {
+      console.error("Error refetching user:", error);
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user: user ?? null,
         isLoading,
         error,
+        refetchUser,
         loginMutation,
         logoutMutation,
         registerMutation,
