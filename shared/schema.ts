@@ -77,3 +77,29 @@ export type TransactionType = z.infer<typeof transactionTypeSchema>;
 // Pallet status type
 export const palletStatusSchema = z.enum(["active", "archived", "damaged"]);
 export type PalletStatus = z.infer<typeof palletStatusSchema>;
+
+// User related schemas
+export const userRoleSchema = z.enum(["admin", "manager", "operator", "viewer"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(), // Hashed password, never store plaintext!
+  role: text("role", { enum: ["admin", "manager", "operator", "viewer"] }).notNull().default("viewer"),
+  email: text("email"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastLogin: timestamp("last_login")
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  lastLogin: true
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;

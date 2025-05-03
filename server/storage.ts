@@ -30,6 +30,14 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   deleteTransaction(id: number): Promise<boolean>;
   
+  // User Management
+  getUsers(): Promise<User[]>;
+  getUserById(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
+  
   // Utility
   generatePalletId(): Promise<string>;
   isPalletEmpty(palletId: number): Promise<boolean>;
