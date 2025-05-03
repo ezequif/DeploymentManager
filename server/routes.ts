@@ -10,7 +10,9 @@ import {
   InsertPallet,
   InsertLot,
   unitSchema,
-  Unit
+  Unit,
+  User,
+  InsertUser
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth } from "./auth";
@@ -27,6 +29,158 @@ type WSMessage = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
+  
+  // User management endpoints
+  // Get all users - admin only
+  app.get('/api/users', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      // Remove password field from response
+      const sanitizedUsers = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      res.json(sanitizedUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+  
+  // Get single user by ID - admin only
+  app.get('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = await storage.getUserById(id);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Remove password field from response
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      res.status(500).json({ error: 'Failed to fetch user' });
+    }
+  });
+  
+  // Update user - admin only (or self update for limited fields)
+  app.patch('/api/users/:id', authenticateToken, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userData = req.body;
+      const currentUser = (req as any).user;
+      
+      // Only admins can update other users or change roles
+      if (id !== currentUser.userId && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Insufficient permissions to update this user' });
+      }
+      
+      // Only admins can change roles
+      if (userData.role && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Only administrators can change user roles' });
+      }
+      
+      // Don't allow password updates via this endpoint
+      if (userData.password) {
+        delete userData.password;
+      }
+      
+      const user = await storage.updateUser(id, userData);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Remove password field from response
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({ error: 'Failed to update user' });
+    }
+  });
+  
+  // Change password endpoint
+  app.post('/api/users/:id/change-password', authenticateToken, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { currentPassword, newPassword } = req.body;
+      const currentUser = (req as any).user;
+      
+      // Only allow users to change their own password, or admins to change anyone's
+      if (id !== currentUser.userId && currentUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Insufficient permissions to change this user\'s password' });
+      }
+      
+      // Require current password for non-admin users changing their own password
+      if (id === currentUser.userId && currentUser.role !== 'admin') {
+        if (!currentPassword) {
+          return res.status(400).json({ error: 'Current password is required' });
+        }
+        
+        const user = await storage.getUserById(id);
+        
+        if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Verify current password (reuse the function from auth.ts)
+        const { verifyPassword } = require('./auth');
+        const isPasswordValid = await verifyPassword(currentPassword, user.password);
+        
+        if (!isPasswordValid) {
+          return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+      }
+      
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'New password must be at least 8 characters' });
+      }
+      
+      // Hash the new password
+      const { hashPassword } = require('./auth');
+      const hashedPassword = await hashPassword(newPassword);
+      
+      // Update the user's password
+      const user = await storage.updateUser(id, { password: hashedPassword });
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+      console.error('Error changing password:', error);
+      res.status(500).json({ error: 'Failed to change password' });
+    }
+  });
+  
+  // Delete user - admin only
+  app.delete('/api/users/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const currentUser = (req as any).user;
+      
+      // Prevent deleting self
+      if (id === currentUser.userId) {
+        return res.status(400).json({ error: 'Cannot delete your own account' });
+      }
+      
+      const success = await storage.deleteUser(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'User not found or could not be deleted' });
+      }
+      
+      res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
+  });
   
   // Store intervals for cleanup when server shuts down
   const intervals: NodeJS.Timeout[] = [];
@@ -707,7 +861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Archive a pallet
-  app.post('/api/pallets/:id/archive', async (req, res) => {
+  app.post('/api/pallets/:id/archive', authenticateToken, authorizeRoles('admin', 'manager'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const notes = req.body.notes as string | undefined;
