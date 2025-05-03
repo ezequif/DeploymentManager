@@ -4,8 +4,13 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { type User, type InsertUser } from "@shared/schema"; 
-type SelectUser = User;
+import { z } from "zod";
+// We need to import User and InsertUser from schema
+import { users, insertUserSchema } from "@shared/schema";
+// Define SelectUser type based on schema
+type SelectUser = typeof users.$inferSelect;
+// Define InsertUser type based on schema
+type InsertUser = z.infer<typeof insertUserSchema>;
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,12 +42,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    // Only enable the query if there's a token in localStorage 
-    enabled: hasToken,
-    // Don't refetch automatically - we'll handle refetching manually when token changes
-    refetchOnWindowFocus: false,
+    // Always enabled - will automatically refetch on mount to ensure user data is available
+    enabled: true,
+    // Refetch when window gets focus to keep session updated
+    refetchOnWindowFocus: true,
     refetchOnMount: true,
-    retry: 1
+    retry: 1,
+    // Reuse the data across navigation
+    staleTime: 300000, // 5 minutes
+    gcTime: 3600000 // 1 hour - gcTime is the newer name for cacheTime
   });
 
   const loginMutation = useMutation({

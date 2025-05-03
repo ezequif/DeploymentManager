@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWebSocket } from "../lib/websocket";
 import { useAuth } from "@/hooks/use-auth";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -27,10 +27,19 @@ import ConnectedClientsModal from "./ConnectedClientsModal";
 
 export default function Header() {
   const { connected, userCount, syncData, lastSync } = useWebSocket();
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation, refetchUser } = useAuth();
   const [, navigate] = useLocation();
   const [showClientsModal, setShowClientsModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Always refetch user data when header mounts or token changes
+  useEffect(() => {
+    // Check if we have a token but no user data 
+    const token = localStorage.getItem("auth_token");
+    if (token && !user) {
+      refetchUser();
+    }
+  }, [user, refetchUser]);
   
   // Function to handle manual sync with animation
   const handleSyncClick = () => {
