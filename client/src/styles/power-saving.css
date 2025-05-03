@@ -1,0 +1,72 @@
+/* 
+  Power saving mode CSS
+  These classes are added to the html element to control
+  power-intensive styles across the application
+*/
+
+/* Low power saving mode - reduce animations and transitions */
+html.power-saving-low {
+  /* Reduce all animations and transitions */
+  * {
+    animation-duration: 0.1s !important;
+    transition-duration: 0.1s !important;
+  }
+  
+  /* Remove shadows */
+  * {
+    box-shadow: none !important;
+  }
+  
+  /* Simplify gradients */
+  [class*="gradient"], 
+  [class*="bg-gradient"] {
+    background: currentColor !important;
+  }
+}
+
+/* High power saving mode - disable animations and use minimal styling */
+html.power-saving-high {
+  /* Disable ALL animations */
+  * {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  
+  /* Use solid colors instead of gradients/opacity */
+  * {
+    opacity: 1 !important;
+  }
+  
+  /* Use simple borders instead of shadows */
+  [class*="shadow"] {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  
+  /* Dark mode is usually more power efficient on OLED screens */
+  @media (prefers-color-scheme: dark) {
+    body {
+      background-color: #000 !important;
+      color: #fff !important;
+    }
+    
+    * {
+      background-color: #000 !important;
+      color: #fff !important;
+      border-color: #333 !important;
+    }
+    
+    input, button, select, textarea {
+      background-color: #111 !important;
+      color: #fff !important;
+      border: 1px solid #333 !important;
+    }
+  }
+  
+  /* Reduce image quality for further power savings */
+  img, svg {
+    filter: grayscale(100%) !important;
+    image-rendering: pixelated !important;
+  }
+}

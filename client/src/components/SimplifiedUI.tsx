@@ -96,7 +96,16 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
         className="content-area"
       >
         <div className="sticky-header sticky top-0 bg-white z-10 pb-2">
-          <h1 className="text-xl font-bold mb-2">Warehouse Inventory</h1>
+          <div className="flex justify-between items-center mb-2">
+            <h1 className="text-xl font-bold">Warehouse Inventory</h1>
+            <button 
+              onClick={() => setPowerSavingMode(!powerSavingMode)}
+              className={`p-1 rounded ${powerSavingMode ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+              title={powerSavingMode ? "Power saving mode active" : "Enable power saving mode"}
+            >
+              {powerSavingMode ? <BatteryLow size={18} /> : <Battery size={18} />}
+            </button>
+          </div>
           
           <div className="relative mb-2">
             <input
