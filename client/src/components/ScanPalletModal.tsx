@@ -106,6 +106,8 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
   // Handle picking lots
   const handlePickLot = (lot: Lot) => {
     if (pallet) {
+      // FEFO check is already handled in PickModal, so we can proceed directly
+      // The PickModal will prevent picking if there are FEFO warnings
       setSelectedLot(lot);
     }
   };
@@ -252,10 +254,11 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                                   </div>
                                 )}
                                 
-                                <div className="mt-3 text-sm bg-gray-50 p-2 rounded border border-gray-200">
-                                  <p className="font-medium text-gray-700">Recommendation:</p>
-                                  <p className="text-gray-600">
-                                    To avoid waste, consume materials with the earliest expiration dates first.
+                                <div className="mt-3 text-sm bg-red-50 p-2 rounded border border-red-200">
+                                  <p className="font-medium text-red-700">FEFO Picking Blocked:</p>
+                                  <p className="text-red-600">
+                                    To maintain inventory quality and reduce waste, picking newer lots is blocked.
+                                    You'll need to provide an override reason when attempting to pick.
                                   </p>
                                 </div>
                               </div>

@@ -26,6 +26,8 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
   const [notes, setNotes] = useState("");
   const [fifoCheck, setFifoCheck] = useState<{ hasOlderLots: boolean, olderLots: Array<{pallet: Pallet, lot: Lot}> } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fefoOverride, setFefoOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
   const { toast } = useToast();
   const { preferredUnit, autoConvert } = useUnitSettings();
   
@@ -108,6 +110,13 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
       // Update lot quantity
       const newQuantity = lot.quantity - numQuantity;
       
+      // Prepare transaction notes with FEFO override information if needed
+      let transactionNotes = notes;
+      if (fifoCheck?.hasOlderLots && fefoOverride) {
+        const fefoInfo = `[FEFO OVERRIDE] Reason: ${overrideReason}`;
+        transactionNotes = notes ? `${fefoInfo} | ${notes}` : fefoInfo;
+      }
+      
       return apiRequest("PATCH", `/api/lots/${lot.id}`, {
         quantity: newQuantity,
         transaction: {
@@ -115,7 +124,7 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
           transactionType: "pick",
           quantity: numQuantity,
           destination,
-          notes
+          notes: transactionNotes
         }
       });
     },
@@ -196,10 +205,11 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                     </div>
                   )}
                   
-                  <div className="mt-3 text-sm bg-gray-50 p-2 rounded border border-gray-200">
-                    <p className="font-medium text-gray-700">Recommendation:</p>
-                    <p className="text-gray-600">
-                      To avoid waste, consume materials with the earliest expiration dates first.
+                  <div className="mt-3 text-sm bg-red-50 p-2 rounded border border-red-200">
+                    <p className="font-medium text-red-700">FEFO Picking Blocked:</p>
+                    <p className="text-red-600">
+                      To maintain inventory quality and reduce waste, picking this lot is blocked. 
+                      Please use older inventory first or provide an override reason below.
                     </p>
                   </div>
                 </div>
@@ -280,6 +290,40 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
+              
+              {/* FEFO Override Section */}
+              {!isLoading && fifoCheck?.hasOlderLots && (
+                <div className="mt-4 p-3 border border-red-300 rounded-md bg-red-50">
+                  <div className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      id="fefoOverride"
+                      checked={fefoOverride}
+                      onChange={(e) => setFefoOverride(e.target.checked)}
+                      className="h-4 w-4 text-red-600 border-red-300 rounded focus:ring-red-500"
+                    />
+                    <label htmlFor="fefoOverride" className="ml-2 block text-sm font-medium text-red-700">
+                      Override FEFO Warning (Manager Approval Required)
+                    </label>
+                  </div>
+                  
+                  {fefoOverride && (
+                    <div className="mt-2">
+                      <Label htmlFor="overrideReason" className="block text-sm font-medium text-red-700 mb-1">
+                        Reason for Override (Required)
+                      </Label>
+                      <Textarea
+                        id="overrideReason"
+                        rows={2}
+                        placeholder="Enter reason for FEFO override (Example: Special order requirement, Quality issue with older lot, etc.)"
+                        value={overrideReason}
+                        onChange={(e) => setOverrideReason(e.target.value)}
+                        className="border-red-300 focus:border-red-500 focus:ring-red-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           
@@ -293,10 +337,17 @@ export default function PickModal({ pallet, lot, onClose }: PickModalProps) {
             </Button>
             <Button 
               onClick={() => pickMutation.mutate()}
-              disabled={pickMutation.isPending || quantity === '' || (typeof quantity === 'number' && (quantity <= 0 || quantity > lot.quantity))}
+              disabled={
+                pickMutation.isPending || 
+                quantity === '' || 
+                (typeof quantity === 'number' && (quantity <= 0 || quantity > lot.quantity)) ||
+                // Disable button if FEFO warning is active and no override, or if override is checked but no reason
+                (fifoCheck?.hasOlderLots && !fefoOverride) || 
+                (fifoCheck?.hasOlderLots && fefoOverride && !overrideReason.trim())
+              }
               className="w-full sm:w-auto bg-secondary hover:bg-secondary/90"
             >
-              {pickMutation.isPending ? "Processing..." : "Confirm Pick"}
+              {pickMutation.isPending ? "Processing..." : (fifoCheck?.hasOlderLots && fefoOverride) ? "Override and Pick" : "Confirm Pick"}
             </Button>
           </div>
         </div>
