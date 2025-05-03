@@ -1,12 +1,34 @@
 import { useState } from "react";
 import { useWebSocket } from "../lib/websocket";
+import { useAuth } from "@/hooks/use-auth";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { SignalHigh, SignalLow, Users, Package, RefreshCw } from "lucide-react";
+import { 
+  SignalHigh, 
+  SignalLow, 
+  Users, 
+  Package, 
+  RefreshCw, 
+  LogOut,
+  LogIn,
+  User,
+  Settings as SettingsIcon
+} from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import ConnectedClientsModal from "./ConnectedClientsModal";
 
 export default function Header() {
   const { connected, userCount, syncData, lastSync } = useWebSocket();
+  const { user, logoutMutation } = useAuth();
+  const [, navigate] = useLocation();
   const [showClientsModal, setShowClientsModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   
@@ -16,6 +38,15 @@ export default function Header() {
     syncData();
     // Reset animation after 2 seconds
     setTimeout(() => setIsSyncing(false), 2000);
+  };
+  
+  // Handle logout
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        navigate("/auth");
+      }
+    });
   };
   
   return (
@@ -65,6 +96,7 @@ export default function Header() {
             </Button>
           )}
           
+          {/* Connection status indicator */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -91,6 +123,70 @@ export default function Header() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          
+          {/* User menu or Login button */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="ml-2 text-white hover:bg-primary-foreground/20"
+                >
+                  <User className="h-5 w-5 mr-1" />
+                  <span className="hidden sm:inline text-sm">
+                    {user.firstName || user.username}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
+                    <span>{user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username}</span>
+                    <span className="text-xs text-muted-foreground">{user.role}</span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="cursor-pointer w-full flex items-center">
+                    <SettingsIcon className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem 
+                  className="text-red-600 focus:text-red-600"
+                  onClick={handleLogout}
+                  disabled={logoutMutation.isPending}
+                >
+                  {logoutMutation.isPending ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      <span>Logging out...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </>
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 text-white hover:bg-primary-foreground/20"
+              onClick={() => navigate("/auth")}
+            >
+              <LogIn className="h-5 w-5 mr-1" />
+              <span className="text-sm">Login</span>
+            </Button>
+          )}
         </div>
       </div>
 
