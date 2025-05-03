@@ -3,29 +3,6 @@ import { PalletWithLots } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 import { isTC70, isLowPowerDevice, hasWebSocketSupport, getBrowserInfo } from './deviceDetection';
 
-// Helper to prevent too many notifications on low-power devices
-const useOptimizedToast = () => {
-  const { toast } = useToast();
-  
-  return {
-    toast: (props: any) => {
-      if (isLowPowerDevice()) {
-        // On low-power devices, only show "important" notifications like errors
-        // or limit the frequency of informational notifications
-        if (props.variant === "destructive" || !props.description?.includes("Synchroniz")) {
-          toast({
-            ...props,
-            duration: props.duration || 3000, // Shorter duration on mobile devices
-          });
-        }
-      } else {
-        // Show all notifications on desktop/non-battery devices
-        toast(props);
-      }
-    }
-  };
-};
-
 // Type for pending operations that will be stored when offline
 export type PendingOperation = {
   id: string;
@@ -92,10 +69,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   // Used for reconnection tracking
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 10;
-  
-  // Use the optimized toast for battery-friendly notifications
-  const optimizedToast = useOptimizedToast();
-  const { toast } = optimizedToast;
+  const { toast } = useToast();
   
   // Function to request the list of connected clients
   const getConnectedClients = useCallback(() => {
@@ -263,10 +237,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     // Log device info on startup for debugging
     console.log('Device info:', getBrowserInfo());
     
-    // Set up the WebSocketPollInterval global for power-saving integration
-    window.WebSocketPollInterval = isLowPowerDevice() ? 10000 : 3000; // 10 seconds for low-power, 3 seconds for regular devices
-
-  // For TC70 devices, we use REST API polling instead of WebSockets
+    // For TC70 devices, we use REST API polling instead of WebSockets
     if (isTC70()) {
       console.log('TC70 detected, using REST API polling instead of WebSockets');
       
@@ -322,8 +293,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
       // Initial data load
       pollData();
       
-      // Set up polling for TC70 devices - reduced polling frequency to save battery (every 30 seconds)
-      const pollingInterval = setInterval(() => pollData(), 30000);
+      // Set up polling for TC70 devices (every 15 seconds)
+      const pollingInterval = setInterval(() => pollData(), 15000);
       
       // Clean up interval on unmount
       return () => clearInterval(pollingInterval);
@@ -386,8 +357,8 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
         // Initial data load and set up polling
         pollData();
         
-        // Polling interval with longer delay for battery conservation
-        const pollingInterval = setInterval(() => pollData(), 30000);
+        // Polling interval that will run every 15 seconds
+        const pollingInterval = setInterval(() => pollData(), 15000);
         
         // Create a cleanup function for the parent useEffect
         const cleanupPolling = () => {
