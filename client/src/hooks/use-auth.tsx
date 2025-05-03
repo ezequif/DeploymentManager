@@ -62,14 +62,20 @@ function normalizeUserData(userData: any): SelectUser | null {
   };
 }
 
+// Response types for auth endpoints
+type AuthResponse = {
+  user: SelectUser;
+  token: string;
+};
+
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
   refetchUser: () => Promise<SelectUser | null>;
-  loginMutation: UseMutationResult<{user: SelectUser, token: string}, Error, LoginData>;
+  loginMutation: UseMutationResult<AuthResponse, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<{user: SelectUser, token: string}, Error, InsertUser>;
+  registerMutation: UseMutationResult<AuthResponse, Error, InsertUser>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -121,15 +127,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       const data = await res.json();
-      // Normalize the user data
+      // Normalize the user data and ensure it's never null
+      const normalizedUser = normalizeUserData(data.user);
+      if (!normalizedUser) {
+        throw new Error("Invalid user data received from server");
+      }
       return {
-        user: normalizeUserData(data.user),
+        user: normalizedUser,
         token: data.token
       };
     },
-    onSuccess: (data: {user: SelectUser, token: string}) => {
-      // Set the normalized user data in the query cache
-      queryClient.setQueryData(["/api/auth/me"], {user: data.user});
+    onSuccess: (data: AuthResponse) => {
+      // The backend /api/auth/me endpoint returns {user: {userId, username, role}}
+      // so we need to format the cache data in the same way
+      queryClient.setQueryData(["/api/auth/me"], {user: {
+        userId: data.user.id,
+        username: data.user.username,
+        role: data.user.role
+      }});
       // Store the token in localStorage
       localStorage.setItem("auth_token", data.token);
       toast({
@@ -150,15 +165,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/auth/register", credentials);
       const data = await res.json();
-      // Normalize the user data
+      // Normalize the user data and ensure it's never null
+      const normalizedUser = normalizeUserData(data.user);
+      if (!normalizedUser) {
+        throw new Error("Invalid user data received from server");
+      }
       return {
-        user: normalizeUserData(data.user),
+        user: normalizedUser,
         token: data.token
       };
     },
-    onSuccess: (data: {user: SelectUser, token: string}) => {
-      // Set the normalized user data in the query cache
-      queryClient.setQueryData(["/api/auth/me"], {user: data.user});
+    onSuccess: (data: AuthResponse) => {
+      // The backend /api/auth/me endpoint returns {user: {userId, username, role}}
+      // so we need to format the cache data in the same way
+      queryClient.setQueryData(["/api/auth/me"], {user: {
+        userId: data.user.id,
+        username: data.user.username,
+        role: data.user.role
+      }});
       // Store the token in localStorage
       localStorage.setItem("auth_token", data.token);
       toast({
