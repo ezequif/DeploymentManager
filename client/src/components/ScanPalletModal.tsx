@@ -212,31 +212,54 @@ export default function ScanPalletModal({ isOpen, onClose }: ScanPalletModalProp
                         // Only show warning if there are lots with earlier expiration dates
                         if (earlierExpiringLots.length > 0) {
                           return (
-                            <Alert variant="destructive" className="mb-4 border-2 border-red-500 fifo-warning text-red-800 shadow-lg">
-                              <div className="flex items-start">
-                                <AlertTriangle className="h-6 w-6 text-red-600 mr-2 mt-0.5 animate-pulse" />
-                                <div>
-                                  <AlertTitle className="text-red-800 font-extrabold text-xl">⚠️ FIFO/FEFO WARNING ⚠️</AlertTitle>
-                                  <AlertDescription className="text-red-700 font-semibold">
-                                    <p className="mb-2 text-base">Lots of RM# <span className="font-extrabold underline">{pallet.rmNumber}</span> with earlier expiration dates exist. Follow FEFO (First Expired, First Out):</p>
-                                    <ul className="list-disc ml-5 space-y-1">
-                                      {earlierExpiringLots.slice(0, 3).map((item: any, index: number) => (
-                                        <li key={index} className="font-bold">
-                                          <span className="font-extrabold">{item.pallet.location}</span>: Lot {item.lot.lotNumber} - {formatQuantity(item.lot.quantity)} {item.lot.unit} (Expires: {formatDate(item.lot.expirationDate)})
-                                        </li>
-                                      ))}
-                                      {earlierExpiringLots.length > 3 && (
-                                        <li className="text-red-600">
-                                          <span className="font-extrabold">
-                                            +{earlierExpiringLots.length - 3} more location(s)
-                                          </span>
-                                        </li>
-                                      )}
-                                    </ul>
-                                  </AlertDescription>
+                            <div className="mb-4 rounded-lg overflow-hidden border-2 border-amber-500 shadow-lg">
+                              {/* Warning Header */}
+                              <div className="bg-gradient-to-r from-amber-500 to-red-500 p-2 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white mr-2 flex-shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <h3 className="text-white font-bold text-lg">FEFO Alert: Older Inventory Available</h3>
+                              </div>
+                              
+                              {/* Warning Content */}
+                              <div className="bg-white p-3">
+                                <p className="text-gray-800 mb-3">
+                                  Older lots of RM# <span className="font-medium">{pallet.rmNumber}</span> should be used first (First Expired, First Out):
+                                </p>
+                                
+                                <div className="grid gap-2">
+                                  {earlierExpiringLots.slice(0, 3).map((item: any, index: number) => (
+                                    <div key={index} className="bg-amber-50 p-2 rounded border border-amber-200 flex justify-between items-center">
+                                      <div className="flex items-center">
+                                        <div className="bg-amber-100 text-amber-800 font-bold px-2 py-1 rounded mr-2">
+                                          {formatDate(item.lot.expirationDate)}
+                                        </div>
+                                        <div>
+                                          <div className="font-medium">{item.pallet.location}</div>
+                                          <div className="text-sm text-gray-600">Lot {item.lot.lotNumber}</div>
+                                        </div>
+                                      </div>
+                                      <div className="text-right font-bold">
+                                        {formatQuantity(item.lot.quantity)} {item.lot.unit}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                
+                                {earlierExpiringLots.length > 3 && (
+                                  <div className="text-center mt-2 text-sm text-amber-800 font-medium">
+                                    +{earlierExpiringLots.length - 3} more location(s) with earlier expiry dates
+                                  </div>
+                                )}
+                                
+                                <div className="mt-3 text-sm bg-gray-50 p-2 rounded border border-gray-200">
+                                  <p className="font-medium text-gray-700">Recommendation:</p>
+                                  <p className="text-gray-600">
+                                    To avoid waste, consume materials with the earliest expiration dates first.
+                                  </p>
                                 </div>
                               </div>
-                            </Alert>
+                            </div>
                           );
                         }
                       }
