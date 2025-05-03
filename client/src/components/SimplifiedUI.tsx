@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PalletWithLots, Lot } from '@shared/schema';
 import { useWebSocket } from '@/lib/websocket';
-import { isTC70 } from '@/lib/deviceDetection';
+import { isTC70, isLowPowerDevice } from '@/lib/deviceDetection';
 import { formatDate, formatQuantity, formatWeightForDisplay } from '@/lib/formatUtils';
-import { QrCode } from 'lucide-react';
+import { QrCode, Battery, BatteryLow } from 'lucide-react';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { useUnitSettings } from '@/hooks/use-unit-settings';
 
@@ -24,6 +24,7 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [powerSavingMode, setPowerSavingMode] = useState(isLowPowerDevice());
   
   // Detect keyboard opening/closing to adjust layout
   const isKeyboardOpen = useKeyboard();
