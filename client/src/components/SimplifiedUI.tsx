@@ -3,9 +3,10 @@ import { PalletWithLots, Lot } from '@shared/schema';
 import { useWebSocket } from '@/lib/websocket';
 import { isTC70, isLowPowerDevice } from '@/lib/deviceDetection';
 import { formatDate, formatQuantity, formatWeightForDisplay } from '@/lib/formatUtils';
-import { QrCode, Battery, BatteryLow } from 'lucide-react';
+import { QrCode, Battery, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
 import { useKeyboard } from '@/hooks/use-keyboard';
 import { useUnitSettings } from '@/hooks/use-unit-settings';
+import { usePowerSaving } from '@/hooks/use-power-saving';
 
 /**
  * A simplified UI specifically optimized for TC70 handheld devices and other low-power devices
@@ -24,7 +25,8 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPallet, setSelectedPallet] = useState<PalletWithLots | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [powerSavingMode, setPowerSavingMode] = useState(isLowPowerDevice());
+  // Use the power saving hook
+  const { powerSavingMode, setPowerSavingMode, autoPowerSaving, setAutoPowerSaving } = usePowerSaving();
   
   // Detect keyboard opening/closing to adjust layout
   const isKeyboardOpen = useKeyboard();
@@ -98,13 +100,24 @@ export function SimplifiedMobileUI({ onSwitchToStandardUI }: SimplifiedMobileUIP
         <div className="sticky-header sticky top-0 bg-white z-10 pb-2">
           <div className="flex justify-between items-center mb-2">
             <h1 className="text-xl font-bold">Warehouse Inventory</h1>
-            <button 
-              onClick={() => setPowerSavingMode(!powerSavingMode)}
-              className={`p-1 rounded ${powerSavingMode ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
-              title={powerSavingMode ? "Power saving mode active" : "Enable power saving mode"}
-            >
-              {powerSavingMode ? <BatteryLow size={18} /> : <Battery size={18} />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setPowerSavingMode(powerSavingMode === 'off' ? 'low' : powerSavingMode === 'low' ? 'high' : 'off')}
+                className={`p-1 rounded ${powerSavingMode !== 'off' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                title={`Power saving: ${powerSavingMode}`}
+              >
+                {powerSavingMode === 'high' ? <BatteryLow size={18} /> : 
+                 powerSavingMode === 'low' ? <BatteryMedium size={18} /> : 
+                 <BatteryFull size={18} />}
+              </button>
+              <div 
+                className="cursor-pointer text-xs text-gray-500"
+                onClick={() => setAutoPowerSaving(!autoPowerSaving)}
+                title={autoPowerSaving ? "Auto power saving on" : "Auto power saving off"}
+              >
+                {autoPowerSaving ? "Auto" : ""}
+              </div>
+            </div>
           </div>
           
           <div className="relative mb-2">

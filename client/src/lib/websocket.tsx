@@ -263,7 +263,10 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     // Log device info on startup for debugging
     console.log('Device info:', getBrowserInfo());
     
-    // For TC70 devices, we use REST API polling instead of WebSockets
+    // Set up the WebSocketPollInterval global for power-saving integration
+    window.WebSocketPollInterval = isLowPowerDevice() ? 10000 : 3000; // 10 seconds for low-power, 3 seconds for regular devices
+
+  // For TC70 devices, we use REST API polling instead of WebSockets
     if (isTC70()) {
       console.log('TC70 detected, using REST API polling instead of WebSockets');
       
