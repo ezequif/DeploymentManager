@@ -4,6 +4,7 @@ import { storage } from './storage';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { User, InsertUser } from '@shared/schema';
+import { authenticateToken, authorizeRoles } from './middleware/auth';
 
 // Secret for JWT - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'warehouse-management-temp-secret';
@@ -134,6 +135,99 @@ export async function register(req: Request, res: Response) {
   }
 }
 
+// Password change handler
+export async function changePassword(req: Request, res: Response) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = (req as any).user;
+    
+    // Input validation
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    // Check if the user is authenticated
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    // Get the user with password from storage to verify the current password
+    const fullUser = await storage.getUserByUsername(user.username);
+    
+    if (!fullUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Verify the current password
+    const isPasswordValid = await verifyPassword(currentPassword, fullUser.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash the new password
+    const hashedPassword = await hashPassword(newPassword);
+    
+    // Update the user's password
+    await storage.updateUser(user.userId, { password: hashedPassword });
+    
+    // Generate a new token with updated information
+    const updatedUser = await storage.getUserById(user.userId);
+    
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found after password update' });
+    }
+    
+    const token = generateToken(updatedUser);
+    
+    return res.status(200).json({
+      message: 'Password changed successfully',
+      token
+    });
+  } catch (error) {
+    console.error('Password change error:', error);
+    return res.status(500).json({ error: 'Internal server error during password change' });
+  }
+}
+
+// Admin password reset handler
+export async function adminResetPassword(req: Request, res: Response) {
+  try {
+    const { userId, newPassword } = req.body;
+    const adminUser = (req as any).user;
+    
+    // Input validation
+    if (!userId || !newPassword) {
+      return res.status(400).json({ error: 'User ID and new password are required' });
+    }
+    
+    // Check if the admin is authenticated and has admin privileges
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized: Admin privileges required' });
+    }
+    
+    // Get the target user
+    const targetUser = await storage.getUserById(userId);
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Hash the new password
+    const hashedPassword = await hashPassword(newPassword);
+    
+    // Update the user's password
+    await storage.updateUser(userId, { password: hashedPassword });
+    
+    return res.status(200).json({
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    console.error('Admin password reset error:', error);
+    return res.status(500).json({ error: 'Internal server error during password reset' });
+  }
+}
+
 // Setup auth routes and middleware
 export function setupAuth(app: any) {
   // Login route
@@ -141,6 +235,12 @@ export function setupAuth(app: any) {
   
   // Registration route
   app.post('/api/auth/register', register);
+  
+  // Password change route (requires authentication)
+  app.post('/api/auth/change-password', authenticateToken, changePassword);
+  
+  // Admin password reset route (requires admin privileges)
+  app.post('/api/auth/admin-reset-password', authenticateToken, authorizeRoles('admin'), adminResetPassword);
   
   // Get current user route
   app.get('/api/auth/me', (req: Request, res: Response) => {

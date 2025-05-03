@@ -4,11 +4,17 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ImportCSV } from "@/components/ImportCSV";
 import { ExportCSV } from "@/components/ExportCSV";
 import { useUnitSettings } from "@/hooks/use-unit-settings";
+import { useAuth } from "@/hooks/use-auth";
+import { Input } from "@/components/ui/input";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { LockIcon } from "lucide-react";
+import { z } from "zod";
 
 export default function Settings() {
   const { preferredUnit, setPreferredUnit, autoConvert, setAutoConvert } = useUnitSettings();
@@ -34,8 +40,9 @@ export default function Settings() {
   return (
     <div className="mt-6 space-y-6">
       <Tabs defaultValue="preferences" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-5 h-auto">
           <TabsTrigger value="preferences" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Preferences</TabsTrigger>
+          <TabsTrigger value="security" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Security</TabsTrigger>
           <TabsTrigger value="import" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Data Import</TabsTrigger>
           <TabsTrigger value="export" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">Data Export</TabsTrigger>
           <TabsTrigger value="about" className="text-xs sm:text-sm py-1.5 px-1 sm:py-2 sm:px-3">About</TabsTrigger>
