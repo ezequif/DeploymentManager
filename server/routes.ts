@@ -291,6 +291,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 60000); // Sync every 60 seconds
   
+  // Track connections per IP to prevent excessive connections
+  const connectionsPerIP = new Map<string, number>();
+  const MAX_CONNECTIONS_PER_IP = 5; // Limit to 5 connections per IP
+  
   // WebSocket connection
   wss.on('connection', (ws, req) => {
     // Basic security check for origin
@@ -306,14 +310,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Extract client information
+    // Extract client IP
     const ipAddress = req.headers['x-forwarded-for'] || 
                       req.socket.remoteAddress || 
                       'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    
-    // Connection rate limiting (example)
     const clientIp = typeof ipAddress === 'string' ? ipAddress : ipAddress[0];
+    
+    // Apply connection limits per IP to prevent excessive connections
+    const currentConnections = connectionsPerIP.get(clientIp) || 0;
+    if (currentConnections >= MAX_CONNECTIONS_PER_IP) {
+      console.warn(`Connection limit reached for IP ${clientIp}. Maximum ${MAX_CONNECTIONS_PER_IP} connections allowed.`);
+      ws.close(1013, 'Maximum connection limit reached');
+      return;
+    }
+    
+    // Increment connection counter
+    connectionsPerIP.set(clientIp, currentConnections + 1);
+    
+    // Add a connection cleanup handler when the client disconnects
+    ws.on('close', () => {
+      const count = connectionsPerIP.get(clientIp) || 0;
+      if (count > 0) {
+        connectionsPerIP.set(clientIp, count - 1);
+      }
+    });
+    
+    // Get user agent
+    const userAgent = req.headers['user-agent'] || 'unknown';
     
     // Create a unique client ID with more entropy
     const generateSecureClientId = () => {
