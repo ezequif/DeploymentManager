@@ -21,6 +21,13 @@ interface User {
   lastLogin?: Date;
 }
 
+// API response might have a different structure with userId
+interface ApiUser {
+  userId?: number;
+  username?: string;
+  role?: string;
+}
+
 interface InsertUser {
   username: string;
   password: string;
@@ -32,6 +39,28 @@ interface InsertUser {
 }
 
 type SelectUser = User;
+
+// Helper function to normalize user data that comes from API
+function normalizeUserData(userData: any): SelectUser | null {
+  if (!userData) return null;
+  
+  // Check if the data is wrapped in a user property (common API pattern)
+  const rawUser = userData.user || userData;
+  
+  // Map API response which might have userId to our User type
+  return {
+    id: rawUser.id || rawUser.userId || 0,
+    username: rawUser.username || 'User',
+    password: '', // We never get the password
+    role: rawUser.role || 'user',
+    email: rawUser.email,
+    firstName: rawUser.firstName,
+    lastName: rawUser.lastName,
+    active: rawUser.active !== false,
+    createdAt: rawUser.createdAt ? new Date(rawUser.createdAt) : new Date(),
+    lastLogin: rawUser.lastLogin ? new Date(rawUser.lastLogin) : undefined
+  };
+}
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -54,11 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasToken = !!localStorage.getItem("auth_token");
   
   const {
-    data: user,
+    data: rawUserData,
     error,
     isLoading,
     refetch
-  } = useQuery<SelectUser | null, Error>({
+  } = useQuery<any, Error>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     // Always enabled - will automatically refetch on mount to ensure user data is available
@@ -71,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 300000, // 5 minutes
     gcTime: 3600000 // 1 hour - gcTime is the newer name for cacheTime
   });
+  
+  // Normalize user data using our helper function
+  const user = normalizeUserData(rawUserData);
   
   // Effect to monitor token changes and refresh user data
   useEffect(() => {
@@ -88,10 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
-      return await res.json();
+      const data = await res.json();
+      // Normalize the user data
+      return {
+        user: normalizeUserData(data.user),
+        token: data.token
+      };
     },
     onSuccess: (data: {user: SelectUser, token: string}) => {
-      queryClient.setQueryData(["/api/auth/me"], data.user);
+      // Set the normalized user data in the query cache
+      queryClient.setQueryData(["/api/auth/me"], {user: data.user});
       // Store the token in localStorage
       localStorage.setItem("auth_token", data.token);
       toast({
@@ -111,10 +149,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/auth/register", credentials);
-      return await res.json();
+      const data = await res.json();
+      // Normalize the user data
+      return {
+        user: normalizeUserData(data.user),
+        token: data.token
+      };
     },
     onSuccess: (data: {user: SelectUser, token: string}) => {
-      queryClient.setQueryData(["/api/auth/me"], data.user);
+      // Set the normalized user data in the query cache
+      queryClient.setQueryData(["/api/auth/me"], {user: data.user});
       // Store the token in localStorage
       localStorage.setItem("auth_token", data.token);
       toast({
@@ -156,7 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetchUser = async (): Promise<SelectUser | null> => {
     try {
       const { data } = await refetch();
-      return data ?? null;
+      // Normalize the user data before returning
+      return normalizeUserData(data);
     } catch (error) {
       console.error("Error refetching user:", error);
       return null;
