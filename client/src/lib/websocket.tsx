@@ -229,12 +229,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
     }
     
     // Process each operation in sequence
+    // Get the auth token from localStorage
+    const token = localStorage.getItem("auth_token");
+    
     operations.forEach(op => {
+      // Setup headers with auth token if it exists
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       fetch(op.endpoint, {
         method: op.method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
+        credentials: 'include',
         body: JSON.stringify(op.data)
       })
       .catch(error => {
@@ -337,12 +348,23 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           const apiUrl = `${window.location.origin}/api/pallets`;
           console.log(`Fetching from: ${apiUrl}`);
           
+          // Get the auth token from localStorage
+          const token = localStorage.getItem("auth_token");
+          
+          // Setup headers with auth token if it exists
+          const headers: Record<string, string> = {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store'
+          };
+          
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
           fetch(apiUrl, {
             method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store'
-            }
+            headers: headers,
+            credentials: 'include'
           })
             .then(res => {
               if (!res.ok) {
