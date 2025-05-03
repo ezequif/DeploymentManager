@@ -832,7 +832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a pallet
-  app.patch('/api/pallets/:id', async (req, res) => {
+  app.patch('/api/pallets/:id', authenticateToken, authorizeRoles('admin', 'manager', 'operator'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertPalletSchema.partial().parse(req.body);
@@ -894,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete a pallet
-  app.delete('/api/pallets/:id', async (req, res) => {
+  app.delete('/api/pallets/:id', authenticateToken, authorizeRoles('admin', 'manager'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       console.log(`DELETE request for pallet ID: ${id}`);
@@ -938,7 +938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new lots for a pallet - supports single lot or multiple lots
-  app.post('/api/lots', async (req, res) => {
+  app.post('/api/lots', authenticateToken, authorizeRoles('admin', 'manager', 'operator'), async (req, res) => {
     try {
       // Handle both single lot and multiple lots scenarios
       if (Array.isArray(req.body)) {
@@ -1042,7 +1042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a lot (e.g. when picking)
-  app.patch('/api/lots/:id', async (req, res) => {
+  app.patch('/api/lots/:id', authenticateToken, authorizeRoles('admin', 'manager', 'operator'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertLotSchema.partial().parse(req.body);
@@ -1127,7 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a lot
-  app.delete('/api/lots/:id', async (req, res) => {
+  app.delete('/api/lots/:id', authenticateToken, authorizeRoles('admin', 'manager'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -1164,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get transaction history (most recent first)
-  app.get('/api/transactions', async (req, res) => {
+  app.get('/api/transactions', authenticateToken, async (req, res) => {
     try {
       // Get all transactions, ordered by creation date descending (newest first)
       const transactions = await storage.getTransactions();
@@ -1193,7 +1193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a transaction
-  app.post('/api/transactions', async (req, res) => {
+  app.post('/api/transactions', authenticateToken, authorizeRoles('admin', 'manager', 'operator'), async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       const transaction = await storage.createTransaction(validatedData);
@@ -1225,7 +1225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete a transaction
-  app.delete('/api/transactions/:id', async (req, res) => {
+  app.delete('/api/transactions/:id', authenticateToken, authorizeRoles('admin', 'manager'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
