@@ -449,10 +449,9 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           // Check for new pallets
           const newPallets = message.data.pallets.filter((p: PalletWithLots) => !currentPalletIds.has(p.id));
           
-          // Check for removed pallets
-          const removedPallets = pallets.filter((p: PalletWithLots) => 
-            !newPalletIds.has(p.id) && p.status ? p.status === 'active' : true
-          );
+          // Check for removed pallets - only include actually removed pallets
+          // Ignore status check since it's causing issues
+          const removedPallets = pallets.filter((p: PalletWithLots) => !newPalletIds.has(p.id));
           
           // Track lots that have changed quantities
           type LotUpdate = {
@@ -499,6 +498,9 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
             });
           }
           
+          // Temporarily disabled pallet removal notifications until we can fix the issue
+          // This prevents the constant notifications
+          /*
           if (removedPallets.length > 0) {
             removedPallets.forEach((pallet: PalletWithLots) => {
               toast({
@@ -508,6 +510,7 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
               });
             });
           }
+          */
           
           if (updatedLots.length > 0) {
             updatedLots.forEach((update: LotUpdate) => {

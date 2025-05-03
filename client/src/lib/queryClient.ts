@@ -12,7 +12,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get the auth token from localStorage
+  // Always get a fresh token just before the request
   const token = localStorage.getItem("auth_token");
   
   // Prepare headers with content type if data is provided
@@ -25,15 +25,26 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${token}`;
   }
   
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+  
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error(`Error in ${method} request to ${url}:`, error);
+    
+    // If we get a 401, log a warning
+    if (error instanceof Error && error.message.includes("401")) {
+      console.warn("Unauthorized access, auth token may be invalid");
+    }
+    
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -42,7 +53,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Get the auth token from localStorage
+    // Always get a fresh token just before the request 
+    // This ensures we're using the latest token
     const token = localStorage.getItem("auth_token");
     
     // Setup headers with the auth token if it exists
@@ -51,17 +63,28 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
     
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-      headers,
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    try {
+      const res = await fetch(queryKey[0] as string, {
+        credentials: "include",
+        headers,
+      });
+  
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+  
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      console.error(`Error fetching ${queryKey[0]}:`, error);
+      
+      // If we get a 401, clear the token to force re-login
+      if (error instanceof Error && error.message.includes("401")) {
+        console.warn("Unauthorized access, auth token may be invalid");
+      }
+      
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
