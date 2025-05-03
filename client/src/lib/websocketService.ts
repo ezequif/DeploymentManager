@@ -28,7 +28,8 @@ function getWebSocket(): WebSocket | null {
   // Return existing connection if valid
   if (websocketInstance && (websocketInstance.readyState === WebSocket.OPEN || 
       websocketInstance.readyState === WebSocket.CONNECTING)) {
-    console.log("Using existing WebSocket connection");
+    console.log("Using existing WebSocket connection with state:", 
+      websocketInstance.readyState === WebSocket.OPEN ? "OPEN" : "CONNECTING");
     return websocketInstance;
   }
   

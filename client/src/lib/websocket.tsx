@@ -326,6 +326,11 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
   const handleWebSocketMessage: MessageHandler = useCallback((message) => {
     try {
       switch (message.type) {
+        case 'syncAcknowledged':
+          // Server has acknowledged our sync request, no action needed
+          console.log("Server acknowledged sync request");
+          break;
+          
         case 'init':
           // Silent data loading - reduces console spam
           setPallets(message.data.pallets);
@@ -444,9 +449,9 @@ export const WebSocketProvider = ({ children }: WebSocketProviderProps) => {
           // Check for new pallets
           const newPallets = message.data.pallets.filter((p: PalletWithLots) => !currentPalletIds.has(p.id));
           
-          // Check for removed pallets (active ones, not archived)
+          // Check for removed pallets
           const removedPallets = pallets.filter((p: PalletWithLots) => 
-            !newPalletIds.has(p.id) && p.status === 'active'
+            !newPalletIds.has(p.id) && p.status ? p.status === 'active' : true
           );
           
           // Track lots that have changed quantities
