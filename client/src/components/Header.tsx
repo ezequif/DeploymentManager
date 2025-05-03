@@ -159,7 +159,7 @@ export default function Header() {
                         : (user.username || (user.id ? 'Admin' : 'User'))}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {user.role || 'admin'}
+                      {user.role || 'user'}
                     </span>
                   </div>
                 </DropdownMenuLabel>

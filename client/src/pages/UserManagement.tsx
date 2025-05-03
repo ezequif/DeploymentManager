@@ -93,7 +93,7 @@ type EditUserFormValues = z.infer<typeof editUserSchema>;
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export default function UserManagement() {
-  const { user, refetchUser } = useAuth();
+  const { user, refetchUser, isAdmin } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -113,7 +113,7 @@ export default function UserManagement() {
   
   // Redirect if user is not an admin
   useEffect(() => {
-    if (user && user.role !== "admin") {
+    if (!isAdmin) {
       toast({
         title: "Access Denied",
         description: "You don't have permission to access the user management page",
@@ -121,7 +121,7 @@ export default function UserManagement() {
       });
       navigate("/");
     }
-  }, [user, navigate, toast]);
+  }, [isAdmin, navigate, toast]);
   
   // Fetch users
   const { data: users = [], isLoading, error, refetch } = useQuery<UserWithoutPassword[]>({
@@ -300,7 +300,7 @@ export default function UserManagement() {
   };
   
   // If not an admin, don't render the page
-  if (user && user.role !== "admin") {
+  if (!isAdmin) {
     return null;
   }
   

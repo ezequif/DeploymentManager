@@ -12,8 +12,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { isAdmin } = useAuth();
+  // isAdmin is now provided directly by our updated useAuth hook
   
   return (
     <div className="min-h-screen flex flex-col bg-background">

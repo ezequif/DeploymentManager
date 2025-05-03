@@ -47,12 +47,18 @@ function normalizeUserData(userData: any): SelectUser | null {
   // Check if the data is wrapped in a user property (common API pattern)
   const rawUser = userData.user || userData;
   
+  // Extract role properly, ensuring admin privileges are correctly identified
+  // Server can return a string or a user object containing the role
+  const role = typeof rawUser.role === 'string' 
+    ? rawUser.role 
+    : (rawUser.role === 'admin' || rawUser.role === 'a' ? 'admin' : 'user');
+  
   // Map API response which might have userId to our User type
   return {
     id: rawUser.id || rawUser.userId || 0,
     username: rawUser.username || 'User',
     password: '', // We never get the password
-    role: rawUser.role || 'user',
+    role: role,
     email: rawUser.email,
     firstName: rawUser.firstName,
     lastName: rawUser.lastName,
@@ -249,10 +255,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Helper function to check if a user has admin privileges
+export function isUserAdmin(user: SelectUser | null): boolean {
+  if (!user) return false;
+  return user.role === 'admin';
+}
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context;
+  
+  // Add isAdmin helper for convenience
+  return {
+    ...context,
+    isAdmin: isUserAdmin(context.user)
+  };
 }
